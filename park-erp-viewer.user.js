@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.1
+// @version      6.3.2
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
+// webhook sync test: 2026-08-05
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
 // @grant        none
