@@ -1,0 +1,35 @@
+name: Greasy Fork sync test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/greasyfork-sync-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  test-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Bump userscript version and push
+        shell: bash
+        run: |
+          set -euo pipefail
+          file='park-erp-viewer.user.js'
+          workflow='.github/workflows/greasyfork-sync-test.yml'
+
+          sed -i 's#// @version      6\.3\.1#// @version      6.3.2#' "$file"
+          sed -i '/^\/\/ @description/a // webhook sync test: 2026-08-05' "$file"
+          rm -f "$workflow"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$file" "$workflow"
+          git commit -m 'chore: test Greasy Fork webhook sync'
+          git push
