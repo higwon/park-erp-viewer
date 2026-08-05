@@ -1,0 +1,91 @@
+name: Remove day badges
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/remove-day-badges.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update userscript
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('park-erp-viewer.user.js')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace('// @version      6.3.5', '// @version      6.3.6', 1)
+          text = text.replace(
+              '<span class="attendance-viewer-version">v6.3.5</span>',
+              '<span class="attendance-viewer-version">v6.3.6</span>',
+              1
+          )
+
+          old_subtitle = '''        const todaySubtitle = isWorking
+            ? `현재 근무시간 ${formatMinutes(
+                summary.todayWorkMinutes
+            )} · ${
+                summary.canLeaveNow
+                    ? "지금 퇴근 가능"
+                    : `${summary.availableCheckOutTime}부터 퇴근 가능`
+            }`
+            : summary.description;
+'''
+          new_subtitle = '''        const todaySubtitle = isWorking
+            ? `현재 근무시간 ${formatMinutes(
+                summary.todayWorkMinutes
+            )}`
+            : summary.description;
+'''
+          if old_subtitle not in text:
+              raise SystemExit('today subtitle block not found')
+          text = text.replace(old_subtitle, new_subtitle, 1)
+
+          badge_markup = '''                    ${createDayBadges(record, todayKey)}
+'''
+          if badge_markup not in text:
+              raise SystemExit('day badge markup not found')
+          text = text.replace(badge_markup, '', 1)
+
+          helpers_pattern = re.compile(
+              r'''\n\n    function createDayBadges\(record, todayKey\) \{.*?\n    function createWeekTitle''',
+              re.S
+          )
+          text, count = helpers_pattern.subn(
+              '\n\n    function createWeekTitle',
+              text,
+              count=1
+          )
+          if count != 1:
+              raise SystemExit('day badge helpers not found')
+
+          css_pattern = re.compile(
+              r'''\n            \.attendance-day-badges \{.*?\n            \.attendance-day-badge\.is-vacation,\n            \.attendance-day-badge\.is-holiday \{.*?\n            \}\n''',
+              re.S
+          )
+          text, count = css_pattern.subn('\n', text, count=1)
+          if count != 1:
+              raise SystemExit('day badge css not found')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          node --check park-erp-viewer.user.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/remove-day-badges.yml
+          git add park-erp-viewer.user.js
+          git commit -m 'fix: simplify today summary and remove day badges'
+          git push
