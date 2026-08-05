@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.4
+// @version      6.3.5
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -179,7 +179,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">v6.3.4</span>
+                        <span class="attendance-viewer-version">v6.3.5</span>
                     </div>
                     <p>ERP 조회 결과를 오늘 상태와 주차별 근무시간으로 정리합니다.</p>
                 </div>
@@ -597,16 +597,9 @@
             <section class="attendance-today">
                 <div class="attendance-today-title">
                     <div>
-                        <span class="attendance-today-eyebrow">
-                            오늘
-                        </span>
-
-                        <strong>
-                            ${escapeHtml(summary.title)}
-                        </strong>
-
+                        <span class="attendance-today-eyebrow">오늘</span>
+                        <strong>${escapeHtml(summary.title)}</strong>
                         <p class="attendance-today-summary">
-                            <span class="attendance-summary-clock" aria-hidden="true">◷</span>
                             ${escapeHtml(todaySubtitle)}
                         </p>
                     </div>
@@ -619,48 +612,30 @@
                 <div class="attendance-today-cards">
                     ${createTodayCard(
                         "이번주 근무시간",
-                        formatMinutes(
-                            summary.weeklyWorkMinutes
-                        ),
-                        "",
-                        "◷"
+                        formatMinutes(summary.weeklyWorkMinutes)
                     )}
 
                     ${createTodayCard(
                         "이번주 초과근무",
-                        formatSignedMinutes(
-                            summary.weeklyOvertimeMinutes
-                        ),
-                        getTimeStateClass(
-                            summary.weeklyOvertimeMinutes
-                        ),
-                        "↗"
+                        formatSignedMinutes(summary.weeklyOvertimeMinutes),
+                        getTimeStateClass(summary.weeklyOvertimeMinutes)
                     )}
 
                     ${createTodayCard(
                         "이번주 필요근무",
-                        formatMinutes(
-                            summary.weeklyRequiredMinutes
-                        ),
-                        "",
-                        "◎"
+                        formatMinutes(summary.weeklyRequiredMinutes)
                     )}
 
                     <article class="attendance-today-card attendance-departure-card ${
-                        summary.canLeaveNow
-                            ? "is-ready"
-                            : ""
+                        summary.canLeaveNow ? "is-ready" : ""
                     }">
                         <div class="attendance-departure-heading">
                             <span>퇴근 가능시간</span>
-
                             <button
                                 type="button"
                                 class="attendance-departure-info"
                                 aria-label="퇴근 가능시간 계산 정보"
-                                aria-expanded="false">
-                                i
-                            </button>
+                                aria-expanded="false">i</button>
                         </div>
 
                         <div class="attendance-departure-value">
@@ -669,11 +644,8 @@
                                     ? "is-positive"
                                     : summary.availableCheckOutClass
                             }">
-                                ${escapeHtml(
-                                    summary.availableCheckOutTime
-                                )}
+                                ${escapeHtml(summary.availableCheckOutTime)}
                             </strong>
-
                             ${readyBadge}
                         </div>
 
@@ -681,93 +653,25 @@
                             <div>
                                 ${
                                     summary.todayRecord &&
-                                    summary.todayRecord.workDate ===
-                                        summary.lastWorkDate
+                                    summary.todayRecord.workDate === summary.lastWorkDate
                                         ? `
                                             <aside class="attendance-departure-guide">
-                                                <strong>
-                                                    오늘은 이번 주 마지막 근무일입니다.
-                                                </strong>
-                                                <span>
-                                                    이번 주 남은 필요 근무시간을 적용했습니다.
-                                                </span>
+                                                <strong>오늘은 이번 주 마지막 근무일입니다.</strong>
+                                                <span>이번 주 남은 필요 근무시간을 적용했습니다.</span>
                                             </aside>
-
-                                            <p>
-                                                <span>이번 주 필요 근무시간</span>
-                                                <b>${formatMinutes(
-                                                    summary.weeklyRequiredMinutes
-                                                )}</b>
-                                            </p>
-
-                                            <p>
-                                                <span>누적 근무시간</span>
-                                                <b>
-                                                    ${formatMinutes(
-                                                        summary.priorWorkMinutes
-                                                    )}
-                                                    <em class="${getTimeStateClass(
-                                                        summary.priorOvertimeMinutes
-                                                    )}">
-                                                        ${formatSignedMinutes(
-                                                            summary.priorOvertimeMinutes
-                                                        )}
-                                                    </em>
-                                                </b>
-                                            </p>
-
-                                            <p>
-                                                <span>오늘 필요 근무시간</span>
-                                                <b>${formatMinutes(
-                                                    summary.requiredTodayMinutes
-                                                )}</b>
-                                            </p>
-
-                                            <p>
-                                                <span>오늘 출근시간</span>
-                                                <b>${
-                                                    summary.todayRecord?.checkInTime ??
-                                                    "--:--"
-                                                }</b>
-                                            </p>
-
-                                            <p>
-                                                <span>최종 퇴근 가능시간</span>
-                                                <b>${escapeHtml(
-                                                    summary.availableCheckOutTime
-                                                )}</b>
-                                            </p>
+                                            <p><span>이번 주 필요 근무시간</span><b>${formatMinutes(summary.weeklyRequiredMinutes)}</b></p>
+                                            <p><span>누적 근무시간</span><b>${formatMinutes(summary.priorWorkMinutes)}<em class="${getTimeStateClass(summary.priorOvertimeMinutes)}">${formatSignedMinutes(summary.priorOvertimeMinutes)}</em></b></p>
+                                            <p><span>오늘 필요 근무시간</span><b>${formatMinutes(summary.requiredTodayMinutes)}</b></p>
+                                            <p><span>오늘 출근시간</span><b>${summary.todayRecord?.checkInTime ?? "--:--"}</b></p>
+                                            <p><span>최종 퇴근 가능시간</span><b>${escapeHtml(summary.availableCheckOutTime)}</b></p>
                                         `
                                         : `
                                             <aside class="attendance-departure-guide">
-                                                <strong>
-                                                    오늘은 출근 시간부터 ${formatMinutes(
-                                                        summary.requiredTodayMinutes
-                                                    )} 근무 기준입니다.
-                                                </strong>
+                                                <strong>오늘은 출근 시간부터 ${formatMinutes(summary.requiredTodayMinutes)} 근무 기준입니다.</strong>
                                             </aside>
-
-                                            <p>
-                                                <span>출근시간</span>
-                                                <b>${
-                                                    summary.todayRecord?.checkInTime ??
-                                                    "--:--"
-                                                }</b>
-                                            </p>
-
-                                            <p>
-                                                <span>필요 근무시간</span>
-                                                <b>${formatMinutes(
-                                                    summary.requiredTodayMinutes
-                                                )}</b>
-                                            </p>
-
-                                            <p>
-                                                <span>퇴근 가능시간</span>
-                                                <b>${escapeHtml(
-                                                    summary.availableCheckOutTime
-                                                )}</b>
-                                            </p>
+                                            <p><span>출근시간</span><b>${summary.todayRecord?.checkInTime ?? "--:--"}</b></p>
+                                            <p><span>필요 근무시간</span><b>${formatMinutes(summary.requiredTodayMinutes)}</b></p>
+                                            <p><span>퇴근 가능시간</span><b>${escapeHtml(summary.availableCheckOutTime)}</b></p>
                                         `
                                 }
                             </div>
@@ -777,7 +681,6 @@
             </section>
         `;
     }
-
 
     function bindDepartureInfoEvent() {
         const button = document.querySelector(
@@ -1028,6 +931,7 @@
                 <div class="attendance-day-date">
                     <strong>${formatMonthDay(record.workDate)}</strong>
                     <span>${escapeHtml(record.weekName)}</span>
+                    ${createDayBadges(record, todayKey)}
                 </div>
 
                 <div class="attendance-day-time">
@@ -1847,6 +1751,64 @@
         }
 
         return [...new Set(values)].join(" · ");
+    }
+
+    function createDayBadges(record, todayKey) {
+        const badges = [];
+        const primaryLabel = getPrimaryBadgeLabel(record);
+
+        if (primaryLabel) {
+            badges.push({
+                label: primaryLabel,
+                className: getPrimaryBadgeClass(record)
+            });
+        }
+
+        const isWorking =
+            record.workDate === todayKey &&
+            Boolean(record.checkInTime) &&
+            !record.checkOutTime &&
+            !record.isHoliday &&
+            (!record.isVacation || record.isHalfDay);
+
+        if (isWorking) {
+            badges.push({
+                label: "근무 중",
+                className: "is-current"
+            });
+        }
+
+        return badges.length === 0
+            ? ""
+            : `
+                <span class="attendance-day-badges">
+                    ${badges.map(badge => `
+                        <em class="attendance-day-badge ${badge.className}">
+                            ${escapeHtml(badge.label)}
+                        </em>
+                    `).join("")}
+                </span>
+            `;
+    }
+
+    function getPrimaryBadgeLabel(record) {
+        if (record.isHoliday || record.isVacation) {
+            return getNonWorkingLabel(record);
+        }
+
+        return record.workItem || record.status || "";
+    }
+
+    function getPrimaryBadgeClass(record) {
+        if (record.isHoliday) {
+            return "is-holiday";
+        }
+
+        if (record.isVacation) {
+            return "is-vacation";
+        }
+
+        return "is-working";
     }
 
     function createWeekTitle(startDate, endDate) {
@@ -2790,6 +2752,144 @@
 
             .attendance-departure-value strong {
                 font-size: 19px;
+            }
+
+            /* Simplified modern dashboard */
+            .attendance-today {
+                padding: 16px;
+                border-radius: 16px;
+                box-shadow: none;
+            }
+
+            .attendance-today-title {
+                align-items: flex-start;
+                gap: 14px;
+                margin-bottom: 14px;
+            }
+
+            .attendance-today-title strong {
+                font-size: 18px;
+                line-height: 1.2;
+                letter-spacing: -0.02em;
+            }
+
+            .attendance-today-summary {
+                margin: 6px 0 0 !important;
+                color: #69756f !important;
+                font-size: 13px !important;
+                line-height: 1.5;
+            }
+
+            .attendance-today-badge {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .attendance-today-badge.is-working::before,
+            .attendance-card-icon,
+            .attendance-departure-heading > span::before {
+                display: none !important;
+                content: none !important;
+            }
+
+            .attendance-today-cards {
+                gap: 10px;
+            }
+
+            .attendance-today-card {
+                min-height: 74px;
+                padding: 13px 14px;
+                border-radius: 13px;
+                background: #ffffff;
+                box-shadow: none;
+            }
+
+            .attendance-card-heading {
+                display: block;
+                margin: 0;
+            }
+
+            .attendance-today-card span {
+                margin-bottom: 7px;
+                font-size: 12px;
+            }
+
+            .attendance-today-card strong {
+                font-size: 18px;
+            }
+
+            .attendance-departure-card {
+                min-height: 74px;
+                padding-top: 13px;
+            }
+
+            .attendance-departure-heading {
+                margin-bottom: 7px;
+            }
+
+            .attendance-departure-details {
+                width: 300px;
+                padding: 12px;
+                font-size: 12px;
+            }
+
+            .attendance-departure-guide strong {
+                font-size: 12px;
+                line-height: 1.45;
+            }
+
+            .attendance-departure-guide span,
+            .attendance-departure-details p,
+            .attendance-departure-details p b,
+            .attendance-departure-details p b em {
+                font-size: 11px;
+                line-height: 1.45;
+            }
+
+            .attendance-day-date {
+                align-items: center;
+                flex-wrap: wrap;
+            }
+
+            .attendance-day-badges {
+                display: inline-flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-left: 4px;
+            }
+
+            .attendance-day-badge {
+                display: inline-flex;
+                align-items: center;
+                min-height: 22px;
+                padding: 0 9px;
+                border: 1px solid #dde5e1;
+                border-radius: 999px;
+                background: #f8faf9;
+                color: #5f6d66;
+                font-size: 11px;
+                font-style: normal;
+                font-weight: 700;
+                line-height: 20px;
+                white-space: nowrap;
+            }
+
+            .attendance-day-badge.is-working {
+                background: #f5f7f6;
+                color: #50605a;
+            }
+
+            .attendance-day-badge.is-current {
+                border-color: #cbe8da;
+                background: #eaf8f1;
+                color: #17795b;
+            }
+
+            .attendance-day-badge.is-vacation,
+            .attendance-day-badge.is-holiday {
+                border-color: #f0dfb3;
+                background: #fffbf1;
+                color: #9a6a10;
             }
 
             @media (max-width: 900px) {
