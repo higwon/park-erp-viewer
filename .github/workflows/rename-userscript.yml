@@ -1,0 +1,38 @@
+name: Rename userscript
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rename-userscript.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Rename userscript
+        shell: bash
+        run: |
+          set -euo pipefail
+          old='park_erp_attendance_viewer_v6_3_1.user.js'
+          new='park-erp-viewer.user.js'
+
+          if [ ! -f "$old" ]; then
+            echo "Source file does not exist; nothing to rename."
+            exit 0
+          fi
+
+          mv "$old" "$new"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$old" "$new"
+          git commit -m 'chore: use stable userscript filename'
+          git push
