@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.2
+// @version      6.3.3
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // webhook sync test: 2026-08-05
 // @match        *://erp.parksystems.com/*
@@ -178,7 +178,10 @@
         panel.innerHTML = `
             <header class="attendance-viewer-header">
                 <div class="attendance-viewer-heading">
-                    <strong>내 출퇴근 기록</strong>
+                    <div class="attendance-viewer-title-row">
+                        <strong>내 출퇴근 기록</strong>
+                        <span class="attendance-viewer-version">v6.3.3</span>
+                    </div>
                     <p>ERP 조회 결과를 오늘 상태와 주차별 근무시간으로 정리합니다.</p>
                 </div>
 
@@ -2117,9 +2120,29 @@
                 pointer-events: none;
             }
 
+            .attendance-viewer-title-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
             .attendance-viewer-header strong {
                 color: #17201c;
                 font-size: 20px;
+            }
+
+            .attendance-viewer-version {
+                display: inline-flex;
+                align-items: center;
+                height: 20px;
+                padding: 0 7px;
+                border: 1px solid #dfe6e2;
+                border-radius: 999px;
+                background: #f5f8f6;
+                color: #7b8781;
+                font-size: 11px;
+                font-weight: 600;
+                line-height: 1;
             }
 
             .attendance-viewer-header p {
