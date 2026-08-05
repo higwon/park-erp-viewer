@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.5
+// @version      6.3.6
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -179,7 +179,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">v6.3.5</span>
+                        <span class="attendance-viewer-version">v6.3.6</span>
                     </div>
                     <p>ERP 조회 결과를 오늘 상태와 주차별 근무시간으로 정리합니다.</p>
                 </div>
@@ -582,11 +582,7 @@
         const todaySubtitle = isWorking
             ? `현재 근무시간 ${formatMinutes(
                 summary.todayWorkMinutes
-            )} · ${
-                summary.canLeaveNow
-                    ? "지금 퇴근 가능"
-                    : `${summary.availableCheckOutTime}부터 퇴근 가능`
-            }`
+            )}`
             : summary.description;
 
         const readyBadge = summary.canLeaveNow
@@ -931,7 +927,6 @@
                 <div class="attendance-day-date">
                     <strong>${formatMonthDay(record.workDate)}</strong>
                     <span>${escapeHtml(record.weekName)}</span>
-                    ${createDayBadges(record, todayKey)}
                 </div>
 
                 <div class="attendance-day-time">
@@ -1751,64 +1746,6 @@
         }
 
         return [...new Set(values)].join(" · ");
-    }
-
-    function createDayBadges(record, todayKey) {
-        const badges = [];
-        const primaryLabel = getPrimaryBadgeLabel(record);
-
-        if (primaryLabel) {
-            badges.push({
-                label: primaryLabel,
-                className: getPrimaryBadgeClass(record)
-            });
-        }
-
-        const isWorking =
-            record.workDate === todayKey &&
-            Boolean(record.checkInTime) &&
-            !record.checkOutTime &&
-            !record.isHoliday &&
-            (!record.isVacation || record.isHalfDay);
-
-        if (isWorking) {
-            badges.push({
-                label: "근무 중",
-                className: "is-current"
-            });
-        }
-
-        return badges.length === 0
-            ? ""
-            : `
-                <span class="attendance-day-badges">
-                    ${badges.map(badge => `
-                        <em class="attendance-day-badge ${badge.className}">
-                            ${escapeHtml(badge.label)}
-                        </em>
-                    `).join("")}
-                </span>
-            `;
-    }
-
-    function getPrimaryBadgeLabel(record) {
-        if (record.isHoliday || record.isVacation) {
-            return getNonWorkingLabel(record);
-        }
-
-        return record.workItem || record.status || "";
-    }
-
-    function getPrimaryBadgeClass(record) {
-        if (record.isHoliday) {
-            return "is-holiday";
-        }
-
-        if (record.isVacation) {
-            return "is-vacation";
-        }
-
-        return "is-working";
     }
 
     function createWeekTitle(startDate, endDate) {
@@ -2851,46 +2788,6 @@
                 flex-wrap: wrap;
             }
 
-            .attendance-day-badges {
-                display: inline-flex;
-                flex-wrap: wrap;
-                gap: 6px;
-                margin-left: 4px;
-            }
-
-            .attendance-day-badge {
-                display: inline-flex;
-                align-items: center;
-                min-height: 22px;
-                padding: 0 9px;
-                border: 1px solid #dde5e1;
-                border-radius: 999px;
-                background: #f8faf9;
-                color: #5f6d66;
-                font-size: 11px;
-                font-style: normal;
-                font-weight: 700;
-                line-height: 20px;
-                white-space: nowrap;
-            }
-
-            .attendance-day-badge.is-working {
-                background: #f5f7f6;
-                color: #50605a;
-            }
-
-            .attendance-day-badge.is-current {
-                border-color: #cbe8da;
-                background: #eaf8f1;
-                color: #17795b;
-            }
-
-            .attendance-day-badge.is-vacation,
-            .attendance-day-badge.is-holiday {
-                border-color: #f0dfb3;
-                background: #fffbf1;
-                color: #9a6a10;
-            }
 
             @media (max-width: 900px) {
                 .attendance-today-cards {
