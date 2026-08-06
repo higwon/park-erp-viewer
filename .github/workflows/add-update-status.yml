@@ -1,4 +1,4 @@
-name: Add update status
+name: Add userscript update status
 
 on:
   push:
