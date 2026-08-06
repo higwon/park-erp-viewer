@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.6
+// @version      6.3.7
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -179,17 +179,27 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">v6.3.6</span>
+                        <span class="attendance-viewer-version">v6.3.7</span>
                     </div>
                     <p>ERP 조회 결과를 오늘 상태와 주차별 근무시간으로 정리합니다.</p>
                 </div>
 
-                <button
-                    id="attendance-viewer-close"
-                    type="button"
-                    aria-label="닫기">
-                    ×
-                </button>
+                <div class="attendance-viewer-header-actions">
+                    <a
+                        class="attendance-viewer-web-link"
+                        href="https://attendance-tracker.higwon2.workers.dev/"
+                        target="_blank"
+                        rel="noopener noreferrer">
+                        직접 기록하기 <span aria-hidden="true">↗</span>
+                    </a>
+
+                    <button
+                        id="attendance-viewer-close"
+                        type="button"
+                        aria-label="닫기">
+                        ×
+                    </button>
+                </div>
             </header>
 
             <main id="attendance-viewer-content">
@@ -2069,6 +2079,34 @@
                 margin: 5px 0 0;
                 color: #707b76;
                 font-size: 13px;
+            }
+
+            .attendance-viewer-header-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 0 0 auto;
+            }
+
+            .attendance-viewer-web-link {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                height: 30px;
+                padding: 0 10px;
+                border: 1px solid #d5e3dc;
+                border-radius: 8px;
+                background: #f7faf8;
+                color: #17795b;
+                font-size: 12px;
+                font-weight: 700;
+                text-decoration: none;
+                white-space: nowrap;
+            }
+
+            .attendance-viewer-web-link:hover {
+                border-color: #b9d5c8;
+                background: #eef7f3;
             }
 
             #attendance-viewer-close {
