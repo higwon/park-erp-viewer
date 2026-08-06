@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.10
+// @version      6.3.11
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.10";
+    const CURRENT_VERSION = "6.3.11";
     const LATEST_SCRIPT_URL =
         "https://raw.githubusercontent.com/higwon/park-erp-viewer/main/park-erp-viewer.user.js";
 
@@ -188,7 +188,7 @@
                 return;
             }
 
-            updateLink.textContent = `업데이트 v${latestVersion}`;
+            updateLink.innerHTML = `새 버전 v${latestVersion} 설치하기 <span aria-hidden="true">↗</span>`;
             updateLink.hidden = false;
         } catch (error) {
             console.debug(
@@ -253,7 +253,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">v6.3.10</span>
+                        <span class="attendance-viewer-version">현재 v6.3.11</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -297,6 +297,24 @@
             ?.addEventListener("click", () => {
                 panel.classList.remove("is-open");
             });
+
+        const updateLink = document.getElementById(
+            "attendance-viewer-update-link"
+        );
+
+        updateLink?.addEventListener("pointerdown", event => {
+            event.stopPropagation();
+        });
+
+        updateLink?.addEventListener("click", event => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.open(
+                updateLink.href,
+                "_blank",
+                "noopener,noreferrer"
+            );
+        });
 
         enablePanelDragging(panel);
     }
@@ -2165,17 +2183,19 @@
             .attendance-viewer-update-link {
                 display: inline-flex;
                 align-items: center;
-                min-height: 20px;
-                padding: 2px 7px;
-                border: 1px solid #f1d49a;
-                border-radius: 999px;
-                background: #fff8e8;
-                color: #9a6500;
-                font-size: 10px;
+                gap: 4px;
+                min-height: 24px;
+                padding: 3px 9px;
+                border: 1px solid #e7b95b;
+                border-radius: 7px;
+                background: #fff7df;
+                color: #8a5700;
+                font-size: 11px;
                 font-weight: 700;
                 line-height: 1.3;
                 text-decoration: none;
                 white-space: nowrap;
+                cursor: pointer;
             }
 
             .attendance-viewer-update-link:hover {
