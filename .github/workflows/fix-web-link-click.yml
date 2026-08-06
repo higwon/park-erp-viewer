@@ -1,0 +1,57 @@
+name: Fix attendance web link click
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/fix-web-link-click.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update userscript
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('park-erp-viewer.user.js')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace('// @version      6.3.7', '// @version      6.3.8', 1)
+          text = text.replace(
+              '<span class="attendance-viewer-version">v6.3.7</span>',
+              '<span class="attendance-viewer-version">v6.3.8</span>',
+              1
+          )
+
+          old = '''            if (event.target.closest("button")) {
+                return;
+            }
+'''
+          new = '''            if (event.target.closest("button, a")) {
+                return;
+            }
+'''
+
+          if old not in text:
+              raise SystemExit('drag interaction guard not found')
+
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          node --check park-erp-viewer.user.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-web-link-click.yml
+          git add park-erp-viewer.user.js
+          git commit -m 'fix: allow attendance web link clicks'
+          git push
