@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.14
+// @version      6.3.15
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.14";
+    const CURRENT_VERSION = "6.3.15";
     const LATEST_SCRIPT_API_URL =
         "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
 
@@ -219,6 +219,14 @@
 
             updateLink.innerHTML = `새 버전 v${latestVersion} 설치하기 <span aria-hidden="true">↗</span>`;
             updateLink.hidden = false;
+
+            const refreshHint = document.getElementById(
+                "attendance-viewer-update-refresh-hint"
+            );
+
+            if (refreshHint) {
+                refreshHint.hidden = false;
+            }
         } catch (error) {
             console.debug(
                 "[근태 맞춤 보기] 최신 버전 확인 실패",
@@ -282,7 +290,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.14</span>
+                        <span class="attendance-viewer-version">현재 v6.3.15</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -290,6 +298,12 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             hidden></a>
+                        <span
+                            id="attendance-viewer-update-refresh-hint"
+                            class="attendance-viewer-update-refresh-hint"
+                            hidden>
+                            업데이트 후 새로고침
+                        </span>
                     </div>
                     <p>ERP 조회 결과를 오늘 상태와 주차별 근무시간으로 정리합니다.</p>
                 </div>
@@ -2231,8 +2245,16 @@
                 background: #fff1cf;
             }
 
-            .attendance-viewer-update-link[hidden] {
+            .attendance-viewer-update-link[hidden],
+            .attendance-viewer-update-refresh-hint[hidden] {
                 display: none;
+            }
+
+            .attendance-viewer-update-refresh-hint {
+                color: #8b938f;
+                font-size: 11px;
+                font-weight: 600;
+                white-space: nowrap;
             }
 
             .attendance-viewer-header-actions {
