@@ -1,0 +1,48 @@
+name: Bump test version
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/bump-test-version.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump userscript version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('park-erp-viewer.user.js')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              ('// @version      6.3.9', '// @version      6.3.10'),
+              ('const CURRENT_VERSION = "6.3.9";', 'const CURRENT_VERSION = "6.3.10";'),
+              ('<span class="attendance-viewer-version">v6.3.9</span>', '<span class="attendance-viewer-version">v6.3.10</span>'),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'missing expected text: {old}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          node --check park-erp-viewer.user.js
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/bump-test-version.yml
+          git add park-erp-viewer.user.js
+          git commit -m 'chore: bump userscript version for update test'
+          git push
