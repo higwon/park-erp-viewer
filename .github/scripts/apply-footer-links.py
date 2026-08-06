@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path("park-erp-viewer.user.js")
 source = path.read_text(encoding="utf-8")
@@ -45,7 +46,7 @@ new_footer = '''            <footer class="attendance-viewer-footer">
 
                 <a
                     class="attendance-viewer-footer-link attendance-viewer-feedback-link"
-                    href="https://greasyfork.org/ko/scripts/589938-park-erp-%EA%B7%BC%ED%83%9C-%EB%A7%9D%EC%B6%A4-%EB%B3%B4%EA%B8%B0/feedback#post-discussion"
+                    href="https://greasyfork.org/ko/scripts/589938-park-erp-%EA%B7%BC%ED%83%9C-%EB%A7%9E%EC%B6%A4-%EB%B3%B4%EA%B8%B0/feedback#post-discussion"
                     target="_blank"
                     rel="noopener noreferrer">
                     <span class="attendance-viewer-footer-emoji" aria-hidden="true">🪲</span>
@@ -56,45 +57,6 @@ new_footer = '''            <footer class="attendance-viewer-footer">
 if old_footer not in source:
     raise SystemExit("footer block not found")
 source = source.replace(old_footer, new_footer, 1)
-
-old_css = '''            .attendance-viewer-footer {
-                flex: 0 0 auto;
-                padding: 12px 20px 14px;
-                border-top: 1px solid #e5ebe7;
-                background: #ffffff;
-            }
-
-            .attendance-viewer-feedback-link {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                color: #66726c;
-                font-size: 12px;
-                text-decoration: none;
-            }
-
-            .attendance-viewer-feedback-link:hover {
-                color: #17795b;
-            }
-
-            .attendance-viewer-feedback-link strong {
-                color: #17795b;
-                font-weight: 700;
-            }
-
-            .attendance-viewer-feedback-icon {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 20px;
-                height: 20px;
-                border: 1px solid #cbd5d0;
-                border-radius: 999px;
-                color: #6f7b75;
-                font-size: 11px;
-                font-weight: 700;
-                line-height: 1;
-            }'''
 
 new_css = '''            .attendance-viewer-footer {
                 display: flex;
@@ -144,8 +106,14 @@ new_css = '''            .attendance-viewer-footer {
                 background: #dfe5e2;
             }'''
 
-if old_css not in source:
+pattern = re.compile(
+    r"            \.attendance-viewer-footer \{.*?"
+    r"            \.attendance-viewer-feedback-icon \{.*?"
+    r"            \}",
+    re.DOTALL,
+)
+source, count = pattern.subn(new_css, source, count=1)
+if count != 1:
     raise SystemExit("footer css block not found")
-source = source.replace(old_css, new_css, 1)
 
 path.write_text(source, encoding="utf-8")
