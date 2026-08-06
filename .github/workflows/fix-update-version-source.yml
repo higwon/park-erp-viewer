@@ -1,0 +1,26 @@
+name: Fix userscript update version source
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/fix-update-version-source.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/fix_update_version_source.py
+      - run: node --check park-erp-viewer.user.js
+      - run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-update-version-source.yml .github/fix_update_version_source.py
+          git add park-erp-viewer.user.js
+          git commit -m 'fix: fetch latest userscript version from GitHub API'
+          git push
