@@ -2,10 +2,8 @@ name: Fix attendance web link click
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/fix-web-link-click.yml
+    branches: [main]
+    paths: ['.github/workflows/fix-web-link-click.yml']
 
 permissions:
   contents: write
@@ -15,39 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Update userscript
-        shell: bash
+      - name: Patch userscript
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path('park-erp-viewer.user.js')
-          text = path.read_text(encoding='utf-8')
-
-          text = text.replace('// @version      6.3.7', '// @version      6.3.8', 1)
-          text = text.replace(
-              '<span class="attendance-viewer-version">v6.3.7</span>',
-              '<span class="attendance-viewer-version">v6.3.8</span>',
-              1
-          )
-
-          old = '''            if (event.target.closest("button")) {
-                return;
-            }
-'''
-          new = '''            if (event.target.closest("button, a")) {
-                return;
-            }
-'''
-
-          if old not in text:
-              raise SystemExit('drag interaction guard not found')
-
-          text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
-          PY
-
+          sed -i 's/@version      6.3.7/@version      6.3.8/' park-erp-viewer.user.js
+          sed -i 's/v6.3.7/v6.3.8/' park-erp-viewer.user.js
+          sed -i 's/event.target.closest("button")/event.target.closest("button, a")/' park-erp-viewer.user.js
           node --check park-erp-viewer.user.js
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
