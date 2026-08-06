@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.13
+// @version      6.3.14
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,9 +16,9 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.13";
-    const LATEST_SCRIPT_URL =
-        "https://raw.githubusercontent.com/higwon/park-erp-viewer/main/park-erp-viewer.user.js";
+    const CURRENT_VERSION = "6.3.14";
+    const LATEST_SCRIPT_API_URL =
+        "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
 
     const STANDARD_WORK_MINUTES = 8 * 60;
     const DEFAULT_BREAK_MINUTES = 60;
@@ -160,18 +160,47 @@
 
         try {
             const response = await fetch(
-                `${LATEST_SCRIPT_URL}?timestamp=${Date.now()}`,
-                { cache: "no-store" }
+                `${LATEST_SCRIPT_API_URL}&timestamp=${Date.now()}`,
+                {
+                    cache: "no-store",
+                    headers: {
+                        Accept: "application/vnd.github+json"
+                    }
+                }
             );
 
             if (!response.ok) {
                 return;
             }
 
-            const source = await response.text();
+            const payload = await response.json();
+            const encodedContent = String(payload?.content || "")
+                .replace(/\s/g, "");
+
+            if (!encodedContent) {
+                return;
+            }
+
+            const source = decodeURIComponent(
+                Array.from(
+                    atob(encodedContent),
+                    character =>
+                        `%${character.charCodeAt(0)
+                            .toString(16)
+                            .padStart(2, "0")}`
+                ).join("")
+            );
             const latestVersion = source.match(
                 /^\/\/\s*@version\s+([^\s]+)$/m
             )?.[1];
+
+            console.debug(
+                "[근태 맞춤 보기] 버전 확인",
+                {
+                    currentVersion: CURRENT_VERSION,
+                    latestVersion
+                }
+            );
 
             if (
                 !latestVersion ||
@@ -253,7 +282,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.13</span>
+                        <span class="attendance-viewer-version">현재 v6.3.14</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
