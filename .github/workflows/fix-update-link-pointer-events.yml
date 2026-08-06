@@ -2,10 +2,8 @@ name: Fix update link pointer events
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/fix-update-link-pointer-events.yml
+    branches: [main]
+    paths: ['.github/workflows/fix-update-link-pointer-events.yml']
 
 permissions:
   contents: write
@@ -15,41 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch userscript
+      - shell: bash
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path('park-erp-viewer.user.js')
-          text = path.read_text(encoding='utf-8')
-
-          text = text.replace('// @version      6.3.12', '// @version      6.3.13', 1)
-          text = text.replace('const CURRENT_VERSION = "6.3.12";', 'const CURRENT_VERSION = "6.3.13";', 1)
-          text = text.replace(
-              '<span class="attendance-viewer-version">현재 v6.3.12</span>',
-              '<span class="attendance-viewer-version">현재 v6.3.13</span>',
-              1
-          )
-          text = text.replace(
-              '''            .attendance-viewer-heading {
-                min-width: 0;
-                pointer-events: none;
-            }
-''',
-              '''            .attendance-viewer-heading {
-                min-width: 0;
-            }
-''',
-              1
-          )
-
-          path.write_text(text, encoding='utf-8')
-          PY
-      - run: node --check park-erp-viewer.user.js
-      - run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 -c "from pathlib import Path; p=Path('park-erp-viewer.user.js'); s=p.read_text(encoding='utf-8'); s=s.replace('// @version      6.3.12','// @version      6.3.13',1).replace('const CURRENT_VERSION = \"6.3.12\";','const CURRENT_VERSION = \"6.3.13\";',1).replace('<span class=\"attendance-viewer-version\">현재 v6.3.12</span>','<span class=\"attendance-viewer-version\">현재 v6.3.13</span>',1).replace('                pointer-events: none;\n','',1); p.write_text(s,encoding='utf-8')"
+          node --check park-erp-viewer.user.js
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git rm .github/workflows/fix-update-link-pointer-events.yml
           git add park-erp-viewer.user.js
-          git commit -m 'fix: enable update link pointer events'
+          git commit -m "fix: enable update link pointer events"
           git push
