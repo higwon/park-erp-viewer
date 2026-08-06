@@ -1,11 +1,8 @@
 name: Add attendance web link
 
-on:
+'on':
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/add-web-link.yml
+    branches: [main]
 
 permissions:
   contents: write
@@ -15,23 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Update userscript
-        shell: bash
+      - name: Patch userscript
         run: |
-          python3 <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
-
-          path = Path('park-erp-viewer.user.js')
-          text = path.read_text(encoding='utf-8')
-
-          text = text.replace('// @version      6.3.6', '// @version      6.3.7', 1)
-          text = text.replace(
-              '<span class="attendance-viewer-version">v6.3.6</span>',
-              '<span class="attendance-viewer-version">v6.3.7</span>',
-              1
-          )
-
+          p = Path('park-erp-viewer.user.js')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('// @version      6.3.6', '// @version      6.3.7', 1)
+          s = s.replace('v6.3.6</span>', 'v6.3.7</span>', 1)
           old = '''                <button
                     id="attendance-viewer-close"
                     type="button"
@@ -45,8 +33,7 @@ jobs:
                         href="https://attendance-tracker.higwon2.workers.dev/"
                         target="_blank"
                         rel="noopener noreferrer">
-                        직접 기록하기
-                        <span aria-hidden="true">↗</span>
+                        직접 기록하기 <span aria-hidden="true">↗</span>
                     </a>
 
                     <button
@@ -57,12 +44,10 @@ jobs:
                     </button>
                 </div>
 '''
-          if old not in text:
-              raise SystemExit('header close button block not found')
-          text = text.replace(old, new, 1)
-
-          marker = '''            #attendance-viewer-close {
-'''
+          if old not in s:
+              raise SystemExit('close button block not found')
+          s = s.replace(old, new, 1)
+          marker = '            #attendance-viewer-close {\n'
           css = '''            .attendance-viewer-header-actions {
                 display: flex;
                 align-items: center;
@@ -92,17 +77,15 @@ jobs:
             }
 
 '''
-          if marker not in text:
-              raise SystemExit('close button css marker not found')
-          text = text.replace(marker, css + marker, 1)
-
-          path.write_text(text, encoding='utf-8')
+          if marker not in s:
+              raise SystemExit('close css marker not found')
+          s = s.replace(marker, css + marker, 1)
+          p.write_text(s, encoding='utf-8')
           PY
-
           node --check park-erp-viewer.user.js
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git rm .github/workflows/add-web-link.yml
           git add park-erp-viewer.user.js
-          git commit -m 'feat: add direct attendance web link'
+          git commit -m "feat: add direct attendance web link"
           git push
