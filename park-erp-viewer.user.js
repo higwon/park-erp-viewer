@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.11
+// @version      6.3.12
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.11";
+    const CURRENT_VERSION = "6.3.12";
     const LATEST_SCRIPT_URL =
         "https://raw.githubusercontent.com/higwon/park-erp-viewer/main/park-erp-viewer.user.js";
 
@@ -253,7 +253,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.11</span>
+                        <span class="attendance-viewer-version">현재 v6.3.12</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
