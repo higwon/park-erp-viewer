@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.20
+// @version      6.3.21
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.20";
+    const CURRENT_VERSION = "6.3.21";
     const LATEST_SCRIPT_API_URL =
         "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
     const ATTENDANCE_SITE_ORIGIN =
@@ -31,6 +31,7 @@
     let updateCheckStarted = false;
     let attendanceImportWindow = null;
     let pendingAttendanceImportPayload = null;
+    let attendanceImportResetTimer = null;
 
     injectApiInterceptor();
     initializeUserInterface();
@@ -297,7 +298,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.20</span>
+                        <span class="attendance-viewer-version">현재 v6.3.21</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -336,7 +337,7 @@
                     id="attendance-viewer-import-button"
                     class="attendance-viewer-footer-link attendance-viewer-import-button"
                     type="button">
-                    <span id="attendance-viewer-import-label"><strong>내 계정에 ERP 기록 가져오기</strong> ↗</span>
+                    <span id="attendance-viewer-import-label"><strong>개인 근태 기록 사이트로 기록 보내기</strong> ↗</span>
                 </button>
 
                 <span class="attendance-viewer-footer-divider" aria-hidden="true"></span>
@@ -386,6 +387,10 @@
     }
 
     function startAttendanceImport() {
+        if (attendanceImportResetTimer) {
+            window.clearTimeout(attendanceImportResetTimer);
+            attendanceImportResetTimer = null;
+        }
         const records = attendanceRecords
             .map(createAttendanceImportRecord)
             .filter(Boolean);
@@ -472,6 +477,12 @@
                 `저장 완료 · 신규 ${created} · 수정 ${updated} · 동일 ${unchanged} · 충돌 ${conflicts}`
             );
             pendingAttendanceImportPayload = null;
+            attendanceImportResetTimer = window.setTimeout(() => {
+                setAttendanceImportStatus(
+                    "개인 근태 기록 사이트로 기록 보내기 ↗"
+                );
+                attendanceImportResetTimer = null;
+            }, 5000);
             return;
         }
 
