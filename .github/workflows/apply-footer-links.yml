@@ -1,4 +1,4 @@
-name: Apply ERP import payload fix
+name: Apply ERP import payload sanitizer
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Apply ERP import payload fix
+      - name: Apply ERP import payload sanitizer
         run: python .github/scripts/apply-footer-links.py
 
       - name: Validate userscript syntax
