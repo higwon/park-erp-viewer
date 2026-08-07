@@ -71,15 +71,10 @@ replacement = '''    function createAttendanceImportRecord(record) {
 
     function setAttendanceImportStatus'''
 
-source, count = pattern.subn(replacement, source, count=1)
+source, count = pattern.subn(lambda _: replacement, source, count=1)
 if count != 1:
     raise SystemExit("ERP import record function not found")
 
-source = source.replace(
-    '        pendingAttendanceImportPayload = {\n',
-    '        pendingAttendanceImportPayload = {\n',
-    1,
-)
 source = source.replace(
     '        setAttendanceImportStatus("웹 로그인 및 연결을 기다리는 중...");\n',
     '        console.debug("[근태 맞춤 보기] ERP 가져오기 payload", pendingAttendanceImportPayload);\n\n        setAttendanceImportStatus("웹 로그인 및 연결을 기다리는 중...");\n',
