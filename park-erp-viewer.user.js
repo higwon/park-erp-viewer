@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.23
+// @version      6.3.24
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,9 +16,12 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.23";
-    const LATEST_SCRIPT_URL =
-        "https://raw.githubusercontent.com/higwon/park-erp-viewer/main/park-erp-viewer.user.js";
+    const CURRENT_VERSION = "6.3.24";
+    const LATEST_SCRIPT_META_URL =
+        "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
+    const UPDATE_CHECK_CACHE_KEY =
+        "attendance-viewer-greasyfork-update-check";
+    const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
     const ATTENDANCE_SITE_ORIGIN =
         "https://attendance-tracker.higwon2.workers.dev";
     const ATTENDANCE_IMPORT_URL =
@@ -167,8 +170,19 @@
         updateCheckStarted = true;
 
         try {
+            const cachedUpdate = readCachedUpdateCheck();
+
+            if (
+                cachedUpdate &&
+                Date.now() - cachedUpdate.checkedAt <
+                    UPDATE_CHECK_INTERVAL_MS
+            ) {
+                showAvailableUpdate(cachedUpdate.latestVersion);
+                return;
+            }
+
             const response = await fetch(
-                `${LATEST_SCRIPT_URL}?timestamp=${Date.now()}`,
+                LATEST_SCRIPT_META_URL,
                 {
                     cache: "no-store"
                 }
@@ -189,6 +203,12 @@
                 /^\/\/\s*@version\s+([^\s]+)$/m
             )?.[1];
 
+            if (!latestVersion) {
+                throw new Error("Greasy Fork 버전 정보를 찾지 못했습니다.");
+            }
+
+            writeCachedUpdateCheck(latestVersion);
+
             console.debug(
                 "[근태 맞춤 보기] 버전 확인",
                 {
@@ -197,36 +217,74 @@
                 }
             );
 
-            if (
-                !latestVersion ||
-                compareVersions(latestVersion, CURRENT_VERSION) <= 0
-            ) {
-                return;
-            }
-
-            const updateLink = document.getElementById(
-                "attendance-viewer-update-link"
-            );
-
-            if (!updateLink) {
-                return;
-            }
-
-            updateLink.innerHTML = `새 버전 v${latestVersion} 설치하기 <span aria-hidden="true">↗</span>`;
-            updateLink.hidden = false;
-
-            const refreshHint = document.getElementById(
-                "attendance-viewer-update-refresh-hint"
-            );
-
-            if (refreshHint) {
-                refreshHint.hidden = false;
-            }
+            showAvailableUpdate(latestVersion);
         } catch (error) {
             console.debug(
                 "[근태 맞춤 보기] 최신 버전 확인 실패",
                 error
             );
+        }
+    }
+
+    function showAvailableUpdate(latestVersion) {
+        if (
+            !latestVersion ||
+            compareVersions(latestVersion, CURRENT_VERSION) <= 0
+        ) {
+            return;
+        }
+
+        const updateLink = document.getElementById(
+            "attendance-viewer-update-link"
+        );
+
+        if (!updateLink) {
+            return;
+        }
+
+        updateLink.innerHTML = `새 버전 v${latestVersion} 설치하기 <span aria-hidden="true">↗</span>`;
+        updateLink.hidden = false;
+
+        const refreshHint = document.getElementById(
+            "attendance-viewer-update-refresh-hint"
+        );
+
+        if (refreshHint) {
+            refreshHint.hidden = false;
+        }
+    }
+
+    function readCachedUpdateCheck() {
+        try {
+            const cachedValue = JSON.parse(
+                localStorage.getItem(UPDATE_CHECK_CACHE_KEY) || "null"
+            );
+
+            if (
+                !cachedValue ||
+                !Number.isFinite(cachedValue.checkedAt) ||
+                typeof cachedValue.latestVersion !== "string"
+            ) {
+                return null;
+            }
+
+            return cachedValue;
+        } catch {
+            return null;
+        }
+    }
+
+    function writeCachedUpdateCheck(latestVersion) {
+        try {
+            localStorage.setItem(
+                UPDATE_CHECK_CACHE_KEY,
+                JSON.stringify({
+                    checkedAt: Date.now(),
+                    latestVersion
+                })
+            );
+        } catch {
+            // 저장소를 사용할 수 없는 환경에서는 현재 실행 중에만 확인합니다.
         }
     }
 
@@ -285,7 +343,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                          <span class="attendance-viewer-version">현재 v6.3.23</span>
+                          <span class="attendance-viewer-version">현재 v6.3.24</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
