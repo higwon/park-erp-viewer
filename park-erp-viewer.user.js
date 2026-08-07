@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.20
+// @version      6.3.22
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.20";
+    const CURRENT_VERSION = "6.3.22";
     const LATEST_SCRIPT_API_URL =
         "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
     const ATTENDANCE_SITE_ORIGIN =
@@ -31,6 +31,7 @@
     let updateCheckStarted = false;
     let attendanceImportWindow = null;
     let pendingAttendanceImportPayload = null;
+    let attendanceImportResetTimer = null;
 
     injectApiInterceptor();
     initializeUserInterface();
@@ -297,7 +298,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.20</span>
+                        <span class="attendance-viewer-version">현재 v6.3.22</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -332,12 +333,20 @@
             </main>
 
             <footer class="attendance-viewer-footer">
-                <button
-                    id="attendance-viewer-import-button"
-                    class="attendance-viewer-footer-link attendance-viewer-import-button"
-                    type="button">
-                    <span id="attendance-viewer-import-label"><strong>내 계정에 ERP 기록 가져오기</strong> ↗</span>
-                </button>
+                <div class="attendance-viewer-import-control">
+                    <button
+                        id="attendance-viewer-import-button"
+                        class="attendance-viewer-footer-link attendance-viewer-import-button"
+                        type="button">
+                        <span><strong>개인 근태 기록 사이트로 기록 보내기</strong> ↗</span>
+                    </button>
+                    <span
+                        id="attendance-viewer-import-status"
+                        class="attendance-viewer-import-status"
+                        data-state="idle"
+                        role="status"
+                        aria-live="polite"></span>
+                </div>
 
                 <span class="attendance-viewer-footer-divider" aria-hidden="true"></span>
 
@@ -386,6 +395,10 @@
     }
 
     function startAttendanceImport() {
+        if (attendanceImportResetTimer) {
+            window.clearTimeout(attendanceImportResetTimer);
+            attendanceImportResetTimer = null;
+        }
         const records = attendanceRecords
             .map(createAttendanceImportRecord)
             .filter(Boolean);
@@ -406,7 +419,7 @@
 
         console.debug("[근태 맞춤 보기] ERP 가져오기 payload", pendingAttendanceImportPayload);
 
-        setAttendanceImportStatus("웹 로그인 및 연결을 기다리는 중...");
+        setAttendanceImportStatus("웹 로그인 및 연결을 기다리는 중...", "progress");
 
         attendanceImportWindow = window.open(
             ATTENDANCE_IMPORT_URL,
@@ -416,7 +429,7 @@
 
         if (!attendanceImportWindow) {
             pendingAttendanceImportPayload = null;
-            setAttendanceImportStatus("팝업이 차단되었습니다. 다시 시도해 주세요.", true);
+            setAttendanceImportStatus("팝업이 차단되었습니다. 다시 시도해 주세요.", "error");
             window.alert(
                 "ERP 근태 가져오기 창이 차단되었습니다. 브라우저에서 팝업을 허용해 주세요."
             );
@@ -450,14 +463,16 @@
                 ATTENDANCE_SITE_ORIGIN
             );
             setAttendanceImportStatus(
-                `ERP 기록 ${pendingAttendanceImportPayload.records.length}건 전달 중...`
+                `ERP 기록 ${pendingAttendanceImportPayload.records.length}건 전달 중...`,
+                "progress"
             );
             return;
         }
 
         if (message.type === "ATTENDANCE_IMPORT_RECEIVED") {
             setAttendanceImportStatus(
-                "웹사이트에서 저장 내용을 확인해 주세요."
+                "웹사이트에서 저장 내용을 확인해 주세요.",
+                "progress"
             );
             return;
         }
@@ -469,9 +484,14 @@
             const conflicts = Number(message.conflicts) || 0;
 
             setAttendanceImportStatus(
-                `저장 완료 · 신규 ${created} · 수정 ${updated} · 동일 ${unchanged} · 충돌 ${conflicts}`
+                `저장 완료 · 신규 ${created} · 수정 ${updated} · 동일 ${unchanged} · 충돌 ${conflicts}`,
+                "success"
             );
             pendingAttendanceImportPayload = null;
+            attendanceImportResetTimer = window.setTimeout(() => {
+                setAttendanceImportStatus("", "idle");
+                attendanceImportResetTimer = null;
+            }, 5000);
             return;
         }
 
@@ -480,7 +500,7 @@
                 message.message ||
                 "ERP 근태 기록을 가져오지 못했습니다."
             );
-            setAttendanceImportStatus(text, true);
+            setAttendanceImportStatus(text, "error");
             window.alert(text);
         }
     }
@@ -540,20 +560,21 @@
         return text ? text.slice(0, maxLength) : null;
     }
 
-    function setAttendanceImportStatus(text, isError = false) {
-        const label = document.getElementById(
-            "attendance-viewer-import-label"
+    function setAttendanceImportStatus(text, state = "idle") {
+        const status = document.getElementById(
+            "attendance-viewer-import-status"
         );
         const button = document.getElementById(
             "attendance-viewer-import-button"
         );
 
-        if (label) {
-            label.textContent = text;
+        if (status) {
+            status.textContent = text;
+            status.dataset.state = state;
         }
 
         if (button) {
-            button.classList.toggle("is-error", isError);
+            button.disabled = state === "progress";
         }
     }
 
@@ -2773,9 +2794,67 @@
                 cursor: pointer;
             }
 
-            .attendance-viewer-import-button.is-error,
-            .attendance-viewer-import-button.is-error strong {
+            .attendance-viewer-import-control {
+                display: grid;
+                flex: 0 0 auto;
+                gap: 3px;
+                min-width: 0;
+            }
+
+            .attendance-viewer-import-button:disabled {
+                cursor: wait;
+                opacity: 0.58;
+            }
+
+            .attendance-viewer-import-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                min-height: 15px;
+                color: #748078;
+                font-size: 10px;
+                line-height: 1.3;
+                opacity: 1;
+                transition: color 160ms ease, opacity 160ms ease;
+            }
+
+            .attendance-viewer-import-status[data-state="idle"] {
+                opacity: 0;
+            }
+
+            .attendance-viewer-import-status:not([data-state="idle"])::before {
+                width: 5px;
+                height: 5px;
+                flex: 0 0 auto;
+                border-radius: 999px;
+                background: currentColor;
+                content: "";
+            }
+
+            .attendance-viewer-import-status[data-state="progress"]::before {
+                animation: attendance-import-pulse 1.2s ease-in-out infinite;
+            }
+
+            .attendance-viewer-import-status[data-state="success"] {
+                color: #17795b;
+            }
+
+            .attendance-viewer-import-status[data-state="error"] {
                 color: #b42318;
+            }
+
+            @keyframes attendance-import-pulse {
+                50% { opacity: 0.3; transform: scale(0.82); }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .attendance-viewer-import-status {
+                    transition: none;
+                }
+
+                .attendance-viewer-import-status[data-state="progress"]::before {
+                    animation: none;
+                }
             }
 
             .attendance-viewer-footer-link:hover {
