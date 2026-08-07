@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.0
+// @version      6.4.1
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.0";
+    const CURRENT_VERSION = "6.4.1";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -342,7 +342,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                          <span class="attendance-viewer-version">현재 v6.4.0</span>
+                          <span class="attendance-viewer-version">현재 v6.4.1</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -442,12 +442,13 @@
 
     function startAttendanceImport() {
         const records = attendanceRecords
+            .filter(isImportableWorkday)
             .map(createAttendanceImportRecord)
             .filter(Boolean);
 
         if (records.length === 0) {
             window.alert(
-                "가져올 ERP 근태 기록이 없습니다. 먼저 ERP에서 근태 조회를 실행해 주세요."
+                "가져올 평일 근태 기록이 없습니다. 먼저 ERP에서 근태 조회를 실행해 주세요."
             );
             return;
         }
@@ -575,6 +576,17 @@
 
         console.debug("[근태 맞춤 보기] ERP 가져오기 레코드", importRecord);
         return importRecord;
+    }
+
+    function isImportableWorkday(record) {
+        const date = parseErpDate(record.workDate);
+
+        if (!date || record.isHoliday) {
+            return false;
+        }
+
+        const day = date.getDay();
+        return day !== 0 && day !== 6;
     }
 
     function normalizeImportTime(value) {
