@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.18
+// @version      6.3.19
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.18";
+    const CURRENT_VERSION = "6.3.19";
     const LATEST_SCRIPT_API_URL =
         "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
     const ATTENDANCE_SITE_ORIGIN =
@@ -297,7 +297,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.18</span>
+                        <span class="attendance-viewer-version">현재 v6.3.19</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -404,6 +404,8 @@
             records
         };
 
+        console.debug("[근태 맞춤 보기] ERP 가져오기 payload", pendingAttendanceImportPayload);
+
         setAttendanceImportStatus("웹 로그인 및 연결을 기다리는 중...");
 
         attendanceImportWindow = window.open(
@@ -490,38 +492,52 @@
             return null;
         }
 
-        const hasCheckTime = Boolean(
-            record.checkInTime ||
-            record.checkOutTime
-        );
+        const checkInTime = normalizeImportTime(record.checkInTime);
+        const checkOutTime = normalizeImportTime(record.checkOutTime);
+        const hasCheckTime = Boolean(checkInTime || checkOutTime);
+        const paidMinutes = Number(record.paidWorkMinutes);
+        const paidWorkHours = Number.isFinite(paidMinutes)
+            ? Math.min(8, Math.max(0, paidMinutes / 60))
+            : 0;
 
         let workType = "work";
+        let isHoliday = false;
 
-        if (record.isHoliday) {
+        if (record.isHoliday && !hasCheckTime) {
             workType = "holiday";
-        } else if (
-            record.isFullPaidLeave &&
-            !hasCheckTime
-        ) {
+            isHoliday = true;
+        } else if (record.isFullPaidLeave && !hasCheckTime) {
             workType = "annual";
         } else if (record.isHalfDay) {
             workType = "half";
         }
 
-        return {
+        const importRecord = {
             workDate: formatDateKey(parsedDate),
-            checkInTime: record.checkInTime || null,
-            checkOutTime: record.checkOutTime || null,
+            checkInTime,
+            checkOutTime,
             workType,
-            paidWorkHours: Math.max(
-                0,
-                Number(record.paidWorkMinutes || 0) / 60
-            ),
-            workItemName: record.workItem || null,
-            statusName: record.status || null,
-            dayTypeName: record.dayType || null,
-            isHoliday: Boolean(record.isHoliday)
+            paidWorkHours,
+            workItemName: normalizeImportText(record.workItem, 200),
+            statusName: normalizeImportText(record.status, 100),
+            dayTypeName: normalizeImportText(record.dayType, 100),
+            isHoliday
         };
+
+        console.debug("[근태 맞춤 보기] ERP 가져오기 레코드", importRecord);
+        return importRecord;
+    }
+
+    function normalizeImportTime(value) {
+        const text = String(value || "").trim();
+        return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(text)
+            ? text
+            : null;
+    }
+
+    function normalizeImportText(value, maxLength) {
+        const text = String(value || "").trim();
+        return text ? text.slice(0, maxLength) : null;
     }
 
     function setAttendanceImportStatus(text, isError = false) {
