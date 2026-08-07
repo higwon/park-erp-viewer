@@ -1,4 +1,4 @@
-name: Apply footer links
+name: Apply ERP import integration
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Apply footer patch
+      - name: Apply ERP import patch
         run: python .github/scripts/apply-footer-links.py
 
       - name: Validate userscript syntax
@@ -25,5 +25,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add park-erp-viewer.user.js
-          git commit -m "feat: add personal site and bug report footer links"
+          git commit -m "feat: add ERP attendance import integration"
           git push
