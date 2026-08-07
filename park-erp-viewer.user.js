@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.19
+// @version      6.3.20
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.19";
+    const CURRENT_VERSION = "6.3.20";
     const LATEST_SCRIPT_API_URL =
         "https://api.github.com/repos/higwon/park-erp-viewer/contents/park-erp-viewer.user.js?ref=main";
     const ATTENDANCE_SITE_ORIGIN =
@@ -297,7 +297,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                        <span class="attendance-viewer-version">현재 v6.3.19</span>
+                        <span class="attendance-viewer-version">현재 v6.3.20</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -513,7 +513,7 @@
         }
 
         const importRecord = {
-            workDate: formatDateKey(parsedDate),
+            workDate: formatImportDate(parsedDate),
             checkInTime,
             checkOutTime,
             workType,
@@ -2310,6 +2310,14 @@
             String(date.getMonth() + 1).padStart(2, "0"),
             String(date.getDate()).padStart(2, "0")
         ].join("");
+    }
+
+    function formatImportDate(date) {
+        return [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, "0"),
+            String(date.getDate()).padStart(2, "0")
+        ].join("-");
     }
 
     function getSeoulNow() {
