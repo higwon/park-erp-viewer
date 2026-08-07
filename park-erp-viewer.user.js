@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.3.25
+// @version      6.3.26
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.3.25";
+    const CURRENT_VERSION = "6.3.26";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -342,7 +342,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                          <span class="attendance-viewer-version">현재 v6.3.25</span>
+                          <span class="attendance-viewer-version">현재 v6.3.26</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -379,9 +379,9 @@
             <footer class="attendance-viewer-footer">
                 <button
                     id="attendance-viewer-import-button"
-                    class="attendance-viewer-footer-link attendance-viewer-import-button"
+                    class="attendance-viewer-footer-link attendance-viewer-import-button attendance-viewer-import-primary"
                     type="button">
-                    <span><strong>근태 기록 보내기</strong> ↗</span>
+                    <span><strong>내 계정으로 가져오기</strong> ↗</span>
                 </button>
 
                 <span class="attendance-viewer-footer-divider" aria-hidden="true"></span>
@@ -402,7 +402,7 @@
                     target="_blank"
                     rel="noopener noreferrer">
                     <span class="attendance-viewer-footer-emoji" aria-hidden="true">🪲</span>
-                    <span>문제가 있으신가요? <strong>버그 제보</strong> ↗</span>
+                    <span><strong>버그 제보</strong></span>
                 </a>
             </footer>
         `;
@@ -2803,6 +2803,32 @@
                 background: transparent;
                 font-family: inherit;
                 cursor: pointer;
+            }
+
+            .attendance-viewer-import-primary {
+                min-height: 30px;
+                padding: 5px 10px;
+                border: 1px solid #b9d7ca;
+                border-radius: 9px;
+                background: #edf7f2;
+                color: #17795b;
+                transition: border-color 160ms ease, background 160ms ease,
+                    transform 160ms ease;
+            }
+
+            .attendance-viewer-import-primary:hover {
+                border-color: #91c3ad;
+                background: #e2f2eb;
+            }
+
+            .attendance-viewer-import-primary:active {
+                transform: scale(0.98);
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .attendance-viewer-import-primary {
+                    transition: none;
+                }
             }
 
             .attendance-viewer-footer-link:hover {
