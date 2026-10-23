@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.2
+// @version      6.4.3
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.2";
+    const CURRENT_VERSION = "6.4.3";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -69,47 +69,40 @@
 
                     this.addEventListener("load", function() {
                         try {
-                            if (!this.__attendanceViewerUrl.includes("/api/WebApi")) {
-                                return;
-                            }
-
                             const request = parseRepeatedJson(
                                 this.__attendanceViewerRequestBody
                             );
                             const response = parseRepeatedJson(this.responseText);
 
-                            if (!isAttendanceResponse(response)) {
-                                return;
-                            }
-
-                            const detail = {
-                                request,
-                                response,
-                                queryRange: readQueryRange()
-                            };
-
-                            window.dispatchEvent(
-                                new CustomEvent(EVENT_NAME, {
-                                    detail
-                                })
-                            );
-
-                            if (window !== window.top) {
-                                window.top.postMessage(
-                                    {
-                                        type: BRIDGE_MESSAGE_TYPE,
-                                        detail
-                                    },
-                                    window.location.origin
-                                );
-                            }
+                            publishAttendanceResponse(request, response);
                         } catch (error) {
-                            console.error("[근태 맞춤 보기] 응답 감지 실패", error);
+                            // JSON이 아닌 일반 응답은 무시합니다.
                         }
                     });
 
                     return originalSend.call(this, body);
                 };
+
+                if (typeof window.fetch === "function") {
+                    const originalFetch = window.fetch;
+
+                    window.fetch = async function(...args) {
+                        const response = await originalFetch.apply(this, args);
+
+                        response.clone().text().then(text => {
+                            try {
+                                publishAttendanceResponse(
+                                    args[1]?.body,
+                                    parseRepeatedJson(text)
+                                );
+                            } catch {
+                                // JSON이 아닌 일반 응답은 무시합니다.
+                            }
+                        });
+
+                        return response;
+                    };
+                }
 
                 function parseRepeatedJson(value) {
                     let result = value;
@@ -132,23 +125,51 @@
                 }
 
                 function isAttendanceResponse(response) {
-                    const tables =
-                        response?.JSonData?.Tables ??
-                        response?.Tables;
-
-                    if (!Array.isArray(tables)) {
-                        return false;
-                    }
+                    const tables = getResponseTables(response);
 
                     return tables.some(table =>
-                        table?.TableName === "DataBlock1" &&
                         Array.isArray(table?.Columns) &&
-                        table.Columns.includes("WkDate") &&
-                        (
-                            table.Columns.includes("BeginTimeN") ||
-                            table.Columns.includes("BegTime")
-                        )
+                        table.Columns.includes("WkDate")
                     );
+                }
+
+                function getResponseTables(response) {
+                    const candidates = [
+                        response?.JSonData?.Tables,
+                        response?.Tables,
+                        response?.Result?.JSonData?.Tables,
+                        response?.Result?.Tables,
+                        response?.Data?.JSonData?.Tables,
+                        response?.Data?.Tables
+                    ];
+
+                    return candidates.find(Array.isArray) ?? [];
+                }
+
+                function publishAttendanceResponse(request, response) {
+                    if (!isAttendanceResponse(response)) {
+                        return;
+                    }
+
+                    const detail = {
+                        request: parseRepeatedJson(request),
+                        response,
+                        queryRange: readQueryRange()
+                    };
+
+                    window.dispatchEvent(
+                        new CustomEvent(EVENT_NAME, { detail })
+                    );
+
+                    if (window !== window.top) {
+                        window.top.postMessage(
+                            {
+                                type: BRIDGE_MESSAGE_TYPE,
+                                detail
+                            },
+                            window.location.origin
+                        );
+                    }
                 }
 
                 function readQueryRange() {
@@ -436,7 +457,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                          <span class="attendance-viewer-version">현재 v6.4.2</span>
+                          <span class="attendance-viewer-version">현재 v6.4.3</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -1530,21 +1551,18 @@
 
     function extractAttendanceRecords(response) {
         const normalized = normalizeResponse(response);
-
-        const table =
-            normalized?.JSonData?.Tables?.find(
-                item => item?.TableName === "DataBlock1"
-            ) ??
-            normalized?.Tables?.find(
-                item => item?.TableName === "DataBlock1"
-            );
+        const table = getResponseTables(normalized).find(
+            item =>
+                Array.isArray(item?.Columns) &&
+                item.Columns.includes("WkDate")
+        );
 
         if (
             !Array.isArray(table?.Columns) ||
             !Array.isArray(table?.Rows)
         ) {
             console.warn(
-                "[근태 맞춤 보기] DataBlock1을 찾지 못했습니다.",
+                "[근태 맞춤 보기] 근태 데이터 테이블을 찾지 못했습니다.",
                 normalized
             );
 
@@ -1558,6 +1576,19 @@
             .sort((left, right) =>
                 left.workDate.localeCompare(right.workDate)
             );
+    }
+
+    function getResponseTables(response) {
+        const candidates = [
+            response?.JSonData?.Tables,
+            response?.Tables,
+            response?.Result?.JSonData?.Tables,
+            response?.Result?.Tables,
+            response?.Data?.JSonData?.Tables,
+            response?.Data?.Tables
+        ];
+
+        return candidates.find(Array.isArray) ?? [];
     }
 
     function normalizeResponse(value) {
