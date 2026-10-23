@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.7
+// @version      6.4.8
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.7";
+    const CURRENT_VERSION = "6.4.8";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -320,7 +320,10 @@
                     const workDateIndex = columns.indexOf("WkDate");
                     const workDate = String(row?.[workDateIndex] ?? "");
 
-                    return /^\\d{4}-\\d{2}-\\d{2}$/.test(workDate);
+                    return (
+                        /^\\d{8}$/.test(workDate) ||
+                        /^\\d{4}-\\d{2}-\\d{2}$/.test(workDate)
+                    );
                 }
 
                 function parseRepeatedJson(value) {
@@ -1857,7 +1860,10 @@
         const paidWorkHours =
             getPaidWorkHours(row);
 
-        const workDate = String(row.WkDate || "");
+        const parsedWorkDate = parseErpDate(row.WkDate);
+        const workDate = parsedWorkDate
+            ? formatDateKey(parsedWorkDate)
+            : "";
         const weekName = String(row.WeekName || "");
         const workItem = String(row.WkItemName || "");
         const status = String(row.SMStatusName || "");

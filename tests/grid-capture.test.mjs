@@ -239,6 +239,31 @@ test("K-System GetAllData receives the missing currSheet default", () => {
     assert.equal(result.events.length, 1);
 });
 
+test("K-System compact YYYYMMDD work dates are accepted", () => {
+    const result = runGridCapture({
+        publicDataSet: {
+            Tables: [{
+                TableName: "DataBlock1",
+                Columns: ["WkDate", "WeekName"],
+                Rows: [
+                    ["20261023", "금"],
+                    ["", "합계"]
+                ]
+            }]
+        },
+        dataSource: null,
+        useGlobalSpread: false,
+        requiresCurrSheet: true
+    });
+
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(
+            result.events[0].detail.response.Tables[0].Rows
+        )),
+        [["20261023", "금"]]
+    );
+});
+
 test("SpreadJS cell fallback ignores blank rows and publishes dated rows", () => {
     const result = runGridCapture({
         dataSource: null,
