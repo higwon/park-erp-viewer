@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.9
+// @version      6.4.10
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.9";
+    const CURRENT_VERSION = "6.4.10";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -33,6 +33,7 @@
     let attendanceRecords = [];
     let attendanceQueryRange = null;
     let calculatorStartTime = "09:00";
+    let departureOutsideClickBound = false;
     let updateCheckStarted = false;
     let attendanceImportWindow = null;
     let pendingAttendanceImportPayload = null;
@@ -51,6 +52,7 @@
                 const EVENT_NAME = "${EVENT_NAME}";
                 const BRIDGE_MESSAGE_TYPE = "${BRIDGE_MESSAGE_TYPE}";
                 let lastGridFingerprint = "";
+                let emptyGridPolls = 0;
 
                 if (window.__attendanceViewerInterceptorInstalled) {
                     return;
@@ -117,11 +119,16 @@
                     try {
                         const snapshot = readAttendanceGrid();
 
-                        if (!snapshot || snapshot.Rows.length === 0) {
+                        if (!snapshot) {
                             return;
                         }
+                        if (snapshot.Rows.length === 0) {
+                            if (++emptyGridPolls < 3) return;
+                        } else {
+                            emptyGridPolls = 0;
+                        }
 
-                        const fingerprint = JSON.stringify(snapshot.Rows);
+                        const fingerprint = JSON.stringify([snapshot, readQueryRange()]);
 
                         if (fingerprint === lastGridFingerprint) {
                             return;
@@ -181,7 +188,7 @@
                         columns
                     );
 
-                    if (publicTable?.Rows.length > 0) {
+                    if (publicTable) {
                         return publicTable;
                     }
 
@@ -247,8 +254,7 @@
                         const rows = Array.from(table?.Rows ?? []);
 
                         if (
-                            columns.includes("WkDate") &&
-                            rows.length > 0
+                            columns.includes("WkDate")
                         ) {
                             return {
                                 Columns: columns,
@@ -722,9 +728,10 @@
             <footer class="attendance-viewer-footer">
                 <button
                     id="attendance-viewer-import-button"
+                    title="ERP 기록을 개인 기록 사이트에 반영합니다"
                     class="attendance-viewer-footer-link attendance-viewer-import-button attendance-viewer-import-primary"
                     type="button">
-                    <span><strong>내 계정으로 가져오기</strong></span>
+                    <span><strong>개인 기록에 동기화</strong></span>
                 </button>
 
                 <span class="attendance-viewer-footer-divider" aria-hidden="true"></span>
@@ -1493,6 +1500,7 @@
                         </div>
                     </article>
                 </div>
+                ${!summary.lastWorkDate ? '<div class="attendance-partial-period-note" style="display:flex;gap:7px;font-size:12px;color:#839188;margin:14px 0 0;line-height:1.6"><span aria-hidden="true">ⓘ</span><span>일부 기간 기준입니다. 정확한 퇴근 계산은 월~금 전체를 조회해 주세요.</span></div>' : ""}
             </section>
         `;
     }
@@ -1535,18 +1543,13 @@
                 event.stopPropagation();
             });
 
-        document.addEventListener("click", () => {
-            if (!card.classList.contains("is-expanded")) {
-                return;
-            }
-
-            card.classList.remove("is-expanded");
-
-            button.setAttribute(
-                "aria-expanded",
-                "false"
-            );
-        });
+        if (!departureOutsideClickBound) {
+            departureOutsideClickBound = true;
+            document.addEventListener("click", () => {
+                document.querySelector(".attendance-departure-card")?.classList.remove("is-expanded");
+                document.querySelector(".attendance-departure-info")?.setAttribute("aria-expanded", "false");
+            });
+        }
     }
 
     function createTodayCard(
@@ -2070,7 +2073,12 @@
             ? getEffectiveWorkMinutes(todayRecord, now)
             : 0;
 
-        const lastWorkDate = [...weekDates]
+        const fullWeekDates = Array.from({length: 5}, (_, index) =>
+            formatDateKey(addDays(weekStart, index)));
+        const completeWeek = Boolean(attendanceQueryRange &&
+            attendanceQueryRange.startDate <= fullWeekDates[0] &&
+            attendanceQueryRange.endDate >= fullWeekDates[4]);
+        const lastWorkDate = completeWeek ? [...fullWeekDates]
             .reverse()
             .find(date => {
                 const record = recordsByDate.get(date);
@@ -2080,7 +2088,7 @@
                         ? calculateRequiredMinutes(record)
                         : STANDARD_WORK_MINUTES
                 ) > 0;
-            }) ?? weekDates.at(-1);
+            }) ?? null : null;
 
         const priorDates = weekDates.filter(
             date => date < todayKey
@@ -2144,6 +2152,10 @@
         let availableCheckOutTime = "--:--";
         let availableCheckOutClass = "";
         let canLeaveNow = false;
+        if (todayKey === lastWorkDate && requiredTodayMinutes === 0) {
+            availableCheckOutTime = "이번 주 기준 충족";
+            availableCheckOutClass = "is-positive";
+        }
 
         if (
             todayRecord?.checkInTime &&
