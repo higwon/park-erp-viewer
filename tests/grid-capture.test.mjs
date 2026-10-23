@@ -41,7 +41,8 @@ function runGridCapture({
     values = [],
     polls = 1,
     useGlobalSpread = true,
-    publicDataSet = null
+    publicDataSet = null,
+    requiresCurrSheet = false
 }) {
     const intervals = [];
     const messages = [];
@@ -68,7 +69,20 @@ function runGridCapture({
     const sheetElement = {
         querySelectorAll: () => items,
         ...(publicDataSet
-            ? { GetAllData: () => publicDataSet }
+            ? {
+                GetAllData() {
+                    if (
+                        requiresCurrSheet &&
+                        typeof context.currSheet === "undefined"
+                    ) {
+                        throw new ReferenceError(
+                            "currSheet is not defined"
+                        );
+                    }
+
+                    return publicDataSet;
+                }
+            }
             : {})
     };
     const spreadElement = {};
@@ -131,7 +145,7 @@ function runGridCapture({
         intervals[0]();
     }
 
-    return { events, messages, columns };
+    return { events, messages, columns, context };
 }
 
 test("SpreadJS object data source is published as an attendance table", () => {
@@ -205,6 +219,24 @@ test("K-System public GetAllData API is preferred over private Spread state", ()
             Rows: [["2026-10-23", "금", "09:46", "20:02", 0]]
         }
     );
+});
+
+test("K-System GetAllData receives the missing currSheet default", () => {
+    const result = runGridCapture({
+        publicDataSet: {
+            Tables: [{
+                TableName: "DataBlock1",
+                Columns: ["WkDate", "WeekName"],
+                Rows: [["2026-10-23", "금"]]
+            }]
+        },
+        dataSource: null,
+        useGlobalSpread: false,
+        requiresCurrSheet: true
+    });
+
+    assert.equal(result.context.currSheet, 0);
+    assert.equal(result.events.length, 1);
 });
 
 test("SpreadJS cell fallback ignores blank rows and publishes dated rows", () => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.6
+// @version      6.4.7
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.6";
+    const CURRENT_VERSION = "6.4.7";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -166,6 +166,14 @@
                     // K-System이 시트 DOM 요소에 공개하는 수집 API입니다.
                     // Spread 인스턴스는 Angular 지시문 지역변수이므로
                     // window.Spread보다 이 경로를 우선 사용해야 합니다.
+                    // ERP 2026-10 업데이트에서 GetAllData가 참조하는
+                    // currSheet 전역 초기화가 누락되었습니다. 실제 화면은
+                    // 단일 DataBlock 시트이므로 첫 시트를 명시해 공개 API가
+                    // 정상적으로 현재 조회 결과를 반환하도록 보완합니다.
+                    if (typeof window.currSheet === "undefined") {
+                        window.currSheet = 0;
+                    }
+
                     const publicDataSet = sheetElement.GetAllData?.();
                     const publicTable = normalizePublicDataSet(
                         publicDataSet,
