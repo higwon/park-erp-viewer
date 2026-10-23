@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.3
+// @version      6.4.4
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.3";
+    const CURRENT_VERSION = "6.4.4";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -49,6 +49,7 @@
             (() => {
                 const EVENT_NAME = "${EVENT_NAME}";
                 const BRIDGE_MESSAGE_TYPE = "${BRIDGE_MESSAGE_TYPE}";
+                let lastGridFingerprint = "";
 
                 if (window.__attendanceViewerInterceptorInstalled) {
                     return;
@@ -102,6 +103,170 @@
 
                         return response;
                     };
+                }
+
+                // 최신 ERP는 조회 결과를 응답 객체로 노출하지 않고
+                // SpreadJS 캔버스의 내부 데이터 모델에만 보관하기도 합니다.
+                // 네트워크 감지를 보조 수단으로 유지하되, 화면에 실제로
+                // 바인딩된 데이터를 주기적으로 읽어 가장 확실한 값을 전달합니다.
+                window.setInterval(publishAttendanceGrid, 750);
+                window.addEventListener("load", publishAttendanceGrid);
+
+                function publishAttendanceGrid() {
+                    try {
+                        const snapshot = readAttendanceGrid();
+
+                        if (!snapshot || snapshot.Rows.length === 0) {
+                            return;
+                        }
+
+                        const fingerprint = JSON.stringify(snapshot.Rows);
+
+                        if (fingerprint === lastGridFingerprint) {
+                            return;
+                        }
+
+                        lastGridFingerprint = fingerprint;
+                        publishAttendanceResponse(
+                            null,
+                            { Tables: [snapshot] }
+                        );
+
+                        console.log(
+                            "[근태 맞춤 보기] ERP 그리드 " +
+                            snapshot.Rows.length +
+                            "건 감지"
+                        );
+                    } catch (error) {
+                        console.debug(
+                            "[근태 맞춤 보기] ERP 그리드 확인 대기",
+                            error
+                        );
+                    }
+                }
+
+                function readAttendanceGrid() {
+                    const sheetElement = document.querySelector("#SS1");
+                    const spreadElement = document.querySelector("#SS1_c");
+
+                    if (!sheetElement || !spreadElement) {
+                        return null;
+                    }
+
+                    const columns = Array.from(
+                        sheetElement.querySelectorAll(
+                            "item[datafield][datablock='DataBlock1']"
+                        )
+                    ).map(item => item.getAttribute("datafield"));
+
+                    if (!columns.includes("WkDate")) {
+                        return null;
+                    }
+
+                    const spread = getSpreadInstance(spreadElement);
+                    const sheet = spread?.getActiveSheet?.();
+
+                    if (!sheet) {
+                        return null;
+                    }
+
+                    const dataSource = sheet.getDataSource?.();
+                    const sourceRows = normalizeGridDataSource(dataSource);
+
+                    if (sourceRows.length > 0) {
+                        return {
+                            Columns: columns,
+                            Rows: sourceRows
+                                .map(row => columns.map(column => row?.[column]))
+                                .filter(row => hasWorkDate(columns, row))
+                        };
+                    }
+
+                    const rowCount = Math.min(
+                        Number(sheet.getRowCount?.()) || 0,
+                        1000
+                    );
+                    const columnCount = Math.min(
+                        Number(sheet.getColumnCount?.()) || columns.length,
+                        columns.length
+                    );
+                    const rows = [];
+
+                    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+                        const row = columns.map((column, columnIndex) =>
+                            columnIndex < columnCount
+                                ? sheet.getValue?.(rowIndex, columnIndex)
+                                : undefined
+                        );
+
+                        if (hasWorkDate(columns, row)) {
+                            rows.push(row);
+                        }
+                    }
+
+                    return { Columns: columns, Rows: rows };
+                }
+
+                function getSpreadInstance(element) {
+                    const globalCandidates = [
+                        window.Spread,
+                        window.spread
+                    ];
+                    const globalInstance = globalCandidates.find(candidate =>
+                        typeof candidate?.getActiveSheet === "function"
+                    );
+
+                    if (globalInstance) {
+                        return globalInstance;
+                    }
+
+                    const jquery = window.jQuery;
+
+                    if (typeof jquery !== "function") {
+                        return null;
+                    }
+
+                    const target = jquery(element);
+                    const dataCandidates = [
+                        target.data?.("spread"),
+                        target.data?.("gcSpread"),
+                        target.data?.("wijspread")
+                    ];
+
+                    const dataInstance = dataCandidates.find(candidate =>
+                        typeof candidate?.getActiveSheet === "function"
+                    );
+
+                    if (dataInstance) {
+                        return dataInstance;
+                    }
+
+                    try {
+                        return target.wijspread?.("spread") ?? null;
+                    } catch {
+                        return null;
+                    }
+                }
+
+                function normalizeGridDataSource(dataSource) {
+                    if (Array.isArray(dataSource)) {
+                        return dataSource;
+                    }
+
+                    const candidates = [
+                        dataSource?.sourceCollection,
+                        dataSource?.items,
+                        dataSource?.view
+                    ];
+
+                    return candidates.find(Array.isArray) ?? [];
+                }
+
+                function hasWorkDate(columns, row) {
+                    const workDateIndex = columns.indexOf("WkDate");
+                    const workDate = String(row?.[workDateIndex] ?? "");
+
+                    return /^\\d{4}-\\d{2}-\\d{2}$/.test(workDate);
                 }
 
                 function parseRepeatedJson(value) {
