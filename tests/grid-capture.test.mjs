@@ -40,7 +40,8 @@ function runGridCapture({
     dataSource,
     values = [],
     polls = 1,
-    useGlobalSpread = true
+    useGlobalSpread = true,
+    publicDataSet = null
 }) {
     const intervals = [];
     const messages = [];
@@ -64,7 +65,12 @@ function runGridCapture({
         getValue: (row, column) => values[row]?.[column]
     };
     const spread = { getActiveSheet: () => sheet };
-    const sheetElement = { querySelectorAll: () => items };
+    const sheetElement = {
+        querySelectorAll: () => items,
+        ...(publicDataSet
+            ? { GetAllData: () => publicDataSet }
+            : {})
+    };
     const spreadElement = {};
     const context = {
         console: { log() {}, debug() {} },
@@ -159,6 +165,45 @@ test("SpreadJS object data source is published as an attendance table", () => {
             result.messages[0].message.detail.queryRange
         )),
         { startDate: "2026-10-01", endDate: "2026-10-23" }
+    );
+});
+
+test("K-System public GetAllData API is preferred over private Spread state", () => {
+    const result = runGridCapture({
+        publicDataSet: {
+            Tables: [{
+                TableName: "DataBlock1",
+                Columns: [
+                    { ColumnName: "WkDate" },
+                    { ColumnName: "WeekName" },
+                    { ColumnName: "BeginTimeN" },
+                    { ColumnName: "EndTimeN" },
+                    { ColumnName: "PaidWkCnt" }
+                ],
+                Rows: [
+                    ["2026-10-23", "금", "09:46", "20:02", 0],
+                    ["", "합계", null, null, 0]
+                ]
+            }]
+        },
+        dataSource: null,
+        useGlobalSpread: false
+    });
+
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(
+            result.events[0].detail.response.Tables[0]
+        )),
+        {
+            Columns: [
+                "WkDate",
+                "WeekName",
+                "BeginTimeN",
+                "EndTimeN",
+                "PaidWkCnt"
+            ],
+            Rows: [["2026-10-23", "금", "09:46", "20:02", 0]]
+        }
     );
 });
 

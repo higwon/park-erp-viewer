@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.5
+// @version      6.4.6
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.5";
+    const CURRENT_VERSION = "6.4.6";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -163,6 +163,19 @@
                         return null;
                     }
 
+                    // K-System이 시트 DOM 요소에 공개하는 수집 API입니다.
+                    // Spread 인스턴스는 Angular 지시문 지역변수이므로
+                    // window.Spread보다 이 경로를 우선 사용해야 합니다.
+                    const publicDataSet = sheetElement.GetAllData?.();
+                    const publicTable = normalizePublicDataSet(
+                        publicDataSet,
+                        columns
+                    );
+
+                    if (publicTable?.Rows.length > 0) {
+                        return publicTable;
+                    }
+
                     const spread = getSpreadInstance(spreadElement);
                     const sheet = spread?.getActiveSheet?.();
 
@@ -205,6 +218,39 @@
                     }
 
                     return { Columns: columns, Rows: rows };
+                }
+
+                function normalizePublicDataSet(dataSet, fallbackColumns) {
+                    const tables = Array.from(dataSet?.Tables ?? []);
+
+                    for (const table of tables) {
+                        const rawColumns = Array.from(table?.Columns ?? []);
+                        const columns = rawColumns.length > 0
+                            ? rawColumns.map(column =>
+                                typeof column === "string"
+                                    ? column
+                                    : column?.ColumnName ??
+                                      column?.Name ??
+                                      column?.DataField ??
+                                      column?.dataField
+                            )
+                            : fallbackColumns;
+                        const rows = Array.from(table?.Rows ?? []);
+
+                        if (
+                            columns.includes("WkDate") &&
+                            rows.length > 0
+                        ) {
+                            return {
+                                Columns: columns,
+                                Rows: rows.filter(row =>
+                                    hasWorkDate(columns, row)
+                                )
+                            };
+                        }
+                    }
+
+                    return null;
                 }
 
                 function getSpreadInstance(element) {
