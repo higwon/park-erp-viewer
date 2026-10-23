@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.8
+// @version      6.4.9
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -16,7 +16,7 @@
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.8";
+    const CURRENT_VERSION = "6.4.9";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -32,6 +32,7 @@
 
     let attendanceRecords = [];
     let attendanceQueryRange = null;
+    let calculatorStartTime = "09:00";
     let updateCheckStarted = false;
     let attendanceImportWindow = null;
     let pendingAttendanceImportPayload = null;
@@ -419,6 +420,15 @@
     }
 
     function initializeUserInterface() {
+        document.addEventListener("input", event => {
+            if (event.target.id !== "attendance-calculator-start") return;
+            calculatorStartTime = event.target.value;
+            const output = document.getElementById("attendance-calculator-result");
+            const minutes = Number(event.target.dataset.minutes);
+            if (output) output.textContent = calculatorStartTime
+                ? formatCalculatorDeparture(calculatorStartTime, minutes)
+                : "--:--";
+        });
         window.addEventListener(EVENT_NAME, event =>
             receiveAttendanceResponse(event.detail)
         );
@@ -467,22 +477,18 @@
     }
 
     function normalizeQueryRange(range, records) {
+        const normalize = value => {
+            const text = String(value ?? "").replace(/-/g, "");
+            return /^\d{8}$/.test(text) ? text : null;
+        };
         const recordDates = records
-            .map(record => record.workDate)
-            .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+            .map(record => normalize(record.workDate))
+            .filter(Boolean)
             .sort();
 
-        const startDate = /^\d{4}-\d{2}-\d{2}$/.test(
-            String(range?.startDate || "")
-        )
-            ? String(range.startDate)
-            : recordDates[0];
+        const startDate = normalize(range?.startDate) ?? recordDates[0];
 
-        const endDate = /^\d{4}-\d{2}-\d{2}$/.test(
-            String(range?.endDate || "")
-        )
-            ? String(range.endDate)
-            : recordDates.at(-1);
+        const endDate = normalize(range?.endDate) ?? recordDates.at(-1);
 
         if (!startDate || !endDate || startDate > endDate) {
             return null;
@@ -1103,6 +1109,7 @@
     }
 
     function updateLiveTodayStatus() {
+        if (document.activeElement?.id === "attendance-calculator-start") return;
         const container = document.getElementById(
             "attendance-live-status"
         );
@@ -1114,6 +1121,9 @@
         const expanded =
             container.querySelector(".attendance-departure-card")
                 ?.classList.contains("is-expanded") ?? false;
+        const calculatorExpanded = Boolean(
+            container.querySelector("#attendance-calculator-info")?.open
+        );
 
         const visibleRecords = attendanceRecords.filter(
             record => !record.isWeekend
@@ -1122,6 +1132,8 @@
         container.innerHTML = createTodayStatus(
             calculateTodaySummary(visibleRecords)
         );
+        const calculatorInfo = container.querySelector("#attendance-calculator-info");
+        if (calculatorInfo) calculatorInfo.open = calculatorExpanded;
 
         if (expanded) {
             container
@@ -1411,6 +1423,7 @@
                     </span>
                 </div>
 
+                ${createManualDepartureCalculator(summary)}
                 <div class="attendance-today-cards">
                     ${createTodayCard(
                         "이번주 근무시간",
@@ -1557,6 +1570,47 @@
         `;
     }
 
+    function formatCalculatorDeparture(start, minutes) {
+        const total = timeToMinutes(start) + minutes;
+        return (total >= 1440 ? "다음 날 " : "") + addMinutesToTime(start, minutes);
+    }
+
+    function createManualDepartureCalculator(summary) {
+        const now = getSeoulNow();
+        const today = formatDateKey(now);
+        const friday = formatDateKey(addDays(getMonday(now), 4));
+        const monday = formatDateKey(getMonday(now));
+        const record = summary.todayRecord;
+        if (record?.checkInTime || record?.isHoliday || record?.isVacation ||
+            today !== summary.lastWorkDate || !attendanceQueryRange ||
+            attendanceQueryRange.startDate > monday || attendanceQueryRange.endDate < friday) return "";
+        const priorDates = Array.from({length: 5}, (_, i) =>
+            formatDateKey(addDays(getMonday(now), i))).filter(date => date < today);
+        if (priorDates.some(date => !attendanceRecords.some(item =>
+            item.workDate === date && !isMissingAttendanceRecord(item)))) return "";
+        const minutes = summary.requiredTodayMinutes +
+            (summary.requiredTodayMinutes > 0 ? DEFAULT_BREAK_MINUTES : 0);
+        return `<div style="border-top:1px solid #e2eae7;padding:18px 0;margin-top:18px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <strong style="font-size:14px">예상 퇴근 시간 계산</strong>
+                <details id="attendance-calculator-info" style="position:relative;font-size:12px;color:#7f8e86">
+                    <summary aria-label="계산 안내" style="cursor:pointer;list-style:none;border:1px solid #d3dfd8;border-radius:50%;width:23px;height:23px;text-align:center;line-height:21px">i</summary>
+                    <div style="position:absolute;left:-170px;top:30px;width:260px;padding:14px;background:white;border:1px solid #dce6e0;border-radius:11px;box-shadow:0 8px 25px #263d3020;z-index:3;line-height:1.8">
+                        이번 주 마지막 근무일 기준<br>오늘 필요 근무 ${formatMinutes(summary.requiredTodayMinutes)} · 휴게 ${minutes > summary.requiredTodayMinutes ? "1시간" : "0분"}<br>입력값은 기록에 저장되지 않아요.
+                    </div>
+                </details>
+            </div>
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+                <label style="width:150px;font-size:12px;color:#7f8e86">출근 시간
+                <input id="attendance-calculator-start" type="time" value="${calculatorStartTime}" data-minutes="${minutes}"
+                    style="display:block;width:100%;height:40px;margin-top:6px;padding:7px 10px;border:1px solid #c9dad1;border-radius:9px;background:white;color:#263a30;font-size:17px"></label>
+                <span aria-hidden="true" style="color:#a4b1aa;padding-top:18px">→</span>
+                <div style="flex:1;min-width:130px;font-size:12px;color:#7f8e86">예상 퇴근
+                <output id="attendance-calculator-result" style="display:block;margin-top:6px;font-size:26px;font-weight:700;color:#16845e">${calculatorStartTime ? formatCalculatorDeparture(calculatorStartTime, minutes) : "--:--"}</output></div>
+            </div>
+        </div>`;
+    }
+
     function createWeekSection(week) {
         const summary = calculateWeekSummary(
             week.records,
@@ -1589,8 +1643,8 @@
                             </strong>
 
                             <span>
-                                ${summary.requiredDayCount}일 ·
-                                ${summary.recordedWorkDayCount}일 기록
+                                근무 대상 ${summary.requiredDayCount}일 ·
+                                기록 ${summary.recordedWorkDayCount}일
                             </span>
                         </div>
                     </div>
@@ -1974,7 +2028,14 @@
             groups.get(key).records.push(record);
         }
 
-        return [...groups.values()].sort((left, right) =>
+        const currentWeek = formatDateKey(getMonday(getSeoulNow()));
+        return [...groups.values()].filter(week => {
+            if (week.startDate === currentWeek) return true;
+            const friday = formatDateKey(addDays(parseErpDate(week.startDate), 4));
+            return attendanceQueryRange &&
+                attendanceQueryRange.startDate <= week.startDate &&
+                attendanceQueryRange.endDate >= friday;
+        }).sort((left, right) =>
             left.startDate.localeCompare(right.startDate)
         );
     }
