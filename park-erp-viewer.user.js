@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Park ERP 근태 맞춤 보기
 // @namespace    attendance-viewer
-// @version      6.4.1
+// @version      6.4.2
 // @description  Park ERP 근무내역을 실시간 오늘 상태와 주차별 요약으로 표시합니다.
 // @match        *://erp.parksystems.com/*
 // @run-at       document-start
@@ -11,12 +11,12 @@
 (function () {
     "use strict";
 
-    const TARGET_SERVICE_SEQ = 72220098;
     const EVENT_NAME = "ERP_ATTENDANCE_DATA_RECEIVED";
+    const BRIDGE_MESSAGE_TYPE = "ERP_ATTENDANCE_DATA_BRIDGE";
     const BUTTON_ID = "attendance-viewer-button";
     const PANEL_ID = "attendance-viewer-panel";
     const STYLE_ID = "attendance-viewer-style";
-    const CURRENT_VERSION = "6.4.1";
+    const CURRENT_VERSION = "6.4.2";
     const LATEST_SCRIPT_META_URL =
         "https://update.greasyfork.org/scripts/589938/Park%20ERP%20%EA%B7%BC%ED%83%9C%20%EB%A7%9E%EC%B6%A4%20%EB%B3%B4%EA%B8%B0.meta.js";
     const UPDATE_CHECK_CACHE_KEY =
@@ -31,20 +31,24 @@
     const DEFAULT_BREAK_MINUTES = 60;
 
     let attendanceRecords = [];
+    let attendanceQueryRange = null;
     let updateCheckStarted = false;
     let attendanceImportWindow = null;
     let pendingAttendanceImportPayload = null;
 
     injectApiInterceptor();
-    initializeUserInterface();
+
+    if (window === window.top) {
+        initializeUserInterface();
+    }
 
     function injectApiInterceptor() {
         const script = document.createElement("script");
 
         script.textContent = `
             (() => {
-                const TARGET_SERVICE_SEQ = ${TARGET_SERVICE_SEQ};
                 const EVENT_NAME = "${EVENT_NAME}";
+                const BRIDGE_MESSAGE_TYPE = "${BRIDGE_MESSAGE_TYPE}";
 
                 if (window.__attendanceViewerInterceptorInstalled) {
                     return;
@@ -72,18 +76,33 @@
                             const request = parseRepeatedJson(
                                 this.__attendanceViewerRequestBody
                             );
+                            const response = parseRepeatedJson(this.responseText);
 
-                            if (Number(request?.ServiceSeq) !== TARGET_SERVICE_SEQ) {
+                            if (!isAttendanceResponse(response)) {
                                 return;
                             }
 
-                            const response = parseRepeatedJson(this.responseText);
+                            const detail = {
+                                request,
+                                response,
+                                queryRange: readQueryRange()
+                            };
 
                             window.dispatchEvent(
                                 new CustomEvent(EVENT_NAME, {
-                                    detail: { request, response }
+                                    detail
                                 })
                             );
+
+                            if (window !== window.top) {
+                                window.top.postMessage(
+                                    {
+                                        type: BRIDGE_MESSAGE_TYPE,
+                                        detail
+                                    },
+                                    window.location.origin
+                                );
+                            }
                         } catch (error) {
                             console.error("[근태 맞춤 보기] 응답 감지 실패", error);
                         }
@@ -112,6 +131,37 @@
                     return result;
                 }
 
+                function isAttendanceResponse(response) {
+                    const tables =
+                        response?.JSonData?.Tables ??
+                        response?.Tables;
+
+                    if (!Array.isArray(tables)) {
+                        return false;
+                    }
+
+                    return tables.some(table =>
+                        table?.TableName === "DataBlock1" &&
+                        Array.isArray(table?.Columns) &&
+                        table.Columns.includes("WkDate") &&
+                        (
+                            table.Columns.includes("BeginTimeN") ||
+                            table.Columns.includes("BegTime")
+                        )
+                    );
+                }
+
+                function readQueryRange() {
+                    const startDate = document.getElementById(
+                        "datWkFrDate_dat"
+                    )?.value;
+                    const endDate = document.getElementById(
+                        "datWkToDate_dat"
+                    )?.value;
+
+                    return { startDate, endDate };
+                }
+
                 console.log("[근태 맞춤 보기] 감지기 설치 완료");
             })();
         `;
@@ -126,18 +176,19 @@
     }
 
     function initializeUserInterface() {
-        window.addEventListener(EVENT_NAME, event => {
-            try {
-                attendanceRecords = extractAttendanceRecords(
-                    event.detail?.response
-                );
+        window.addEventListener(EVENT_NAME, event =>
+            receiveAttendanceResponse(event.detail)
+        );
 
-                ensureUserInterface();
-                updateButton();
-                renderPanel();
-            } catch (error) {
-                console.error("[근태 맞춤 보기] 데이터 변환 실패", error);
+        window.addEventListener("message", event => {
+            if (
+                event.origin !== window.location.origin ||
+                event.data?.type !== BRIDGE_MESSAGE_TYPE
+            ) {
+                return;
             }
+
+            receiveAttendanceResponse(event.data.detail);
         });
 
         document.addEventListener("DOMContentLoaded", ensureUserInterface);
@@ -152,6 +203,49 @@
             updateLiveTodayStatus();
             updateLiveWeekStatus();
         }, 1000);
+    }
+
+    function receiveAttendanceResponse(detail) {
+        try {
+            attendanceRecords = extractAttendanceRecords(
+                detail?.response
+            );
+            attendanceQueryRange = normalizeQueryRange(
+                detail?.queryRange,
+                attendanceRecords
+            );
+
+            ensureUserInterface();
+            updateButton();
+            renderPanel();
+        } catch (error) {
+            console.error("[근태 맞춤 보기] 데이터 변환 실패", error);
+        }
+    }
+
+    function normalizeQueryRange(range, records) {
+        const recordDates = records
+            .map(record => record.workDate)
+            .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+            .sort();
+
+        const startDate = /^\d{4}-\d{2}-\d{2}$/.test(
+            String(range?.startDate || "")
+        )
+            ? String(range.startDate)
+            : recordDates[0];
+
+        const endDate = /^\d{4}-\d{2}-\d{2}$/.test(
+            String(range?.endDate || "")
+        )
+            ? String(range.endDate)
+            : recordDates.at(-1);
+
+        if (!startDate || !endDate || startDate > endDate) {
+            return null;
+        }
+
+        return { startDate, endDate };
     }
 
     function ensureUserInterface() {
@@ -342,7 +436,7 @@
                 <div class="attendance-viewer-heading">
                     <div class="attendance-viewer-title-row">
                         <strong>내 출퇴근 기록</strong>
-                          <span class="attendance-viewer-version">현재 v6.4.1</span>
+                          <span class="attendance-viewer-version">현재 v6.4.2</span>
                         <a
                             id="attendance-viewer-update-link"
                             class="attendance-viewer-update-link"
@@ -1634,10 +1728,9 @@
         const todayKey = formatDateKey(now);
         const weekStart = getMonday(now);
         const weekStartKey = formatDateKey(weekStart);
-        const weekDates = Array.from(
-            { length: 5 },
-            (_, index) =>
-                formatDateKey(addDays(weekStart, index))
+        const weekDates = getQueriedWeekdayDates(
+            weekStartKey,
+            records
         );
 
         const recordsByDate = new Map(
@@ -1670,7 +1763,7 @@
                         ? calculateRequiredMinutes(record)
                         : STANDARD_WORK_MINUTES
                 ) > 0;
-            }) ?? weekDates[4];
+            }) ?? weekDates.at(-1);
 
         const priorDates = weekDates.filter(
             date => date < todayKey
@@ -1920,7 +2013,9 @@
             ...common,
             title: getNonWorkingLabel(todayRecord),
             description: createStatusText(todayRecord),
-            badge: "미등록",
+            badge: isMissingAttendanceRecord(todayRecord)
+                ? "기록 없음"
+                : "미등록",
             badgeClass: "is-muted"
         };
     }
@@ -2058,18 +2153,10 @@
             ])
         );
 
-        const parsedWeekStart =
-            parseErpDate(weekStartDate);
-
-        const weekdayDates = parsedWeekStart
-            ? Array.from(
-                { length: 5 },
-                (_, index) =>
-                    formatDateKey(
-                        addDays(parsedWeekStart, index)
-                    )
-            )
-            : records.map(record => record.workDate);
+        const weekdayDates = getQueriedWeekdayDates(
+            weekStartDate,
+            records
+        );
 
         const todayKey = formatDateKey(now);
 
@@ -2150,6 +2237,42 @@
         };
     }
 
+    function getQueriedWeekdayDates(
+        weekStartDate,
+        records = []
+    ) {
+        const parsedWeekStart = parseErpDate(weekStartDate);
+
+        if (!parsedWeekStart) {
+            return records
+                .filter(record => !record.isWeekend)
+                .map(record => record.workDate);
+        }
+
+        const weekDates = Array.from(
+            { length: 5 },
+            (_, index) =>
+                formatDateKey(addDays(parsedWeekStart, index))
+        );
+
+        const fallbackDates = records
+            .map(record => record.workDate)
+            .filter(Boolean)
+            .sort();
+
+        const rangeStart =
+            attendanceQueryRange?.startDate ??
+            fallbackDates[0];
+        const rangeEnd =
+            attendanceQueryRange?.endDate ??
+            fallbackDates.at(-1);
+
+        return weekDates.filter(date =>
+            (!rangeStart || date >= rangeStart) &&
+            (!rangeEnd || date <= rangeEnd)
+        );
+    }
+
     function calculateRequiredMinutes(record) {
         if (!record) {
             return STANDARD_WORK_MINUTES;
@@ -2178,6 +2301,10 @@
     }
 
     function getNonWorkingLabel(record) {
+        if (isMissingAttendanceRecord(record)) {
+            return "기록 없음";
+        }
+
         if (record.workItem) {
             return record.workItem;
         }
@@ -2200,6 +2327,10 @@
     }
 
     function createStatusText(record) {
+        if (isMissingAttendanceRecord(record)) {
+            return "기록 없음";
+        }
+
         const values = [
             record.status,
             record.workItem,
@@ -2215,6 +2346,21 @@
         }
 
         return [...new Set(values)].join(" · ");
+    }
+
+    function isMissingAttendanceRecord(
+        record,
+        todayKey = formatDateKey(getSeoulNow())
+    ) {
+        return (
+            Boolean(record) &&
+            record.workDate <= todayKey &&
+            !record.checkInTime &&
+            !record.checkOutTime &&
+            record.paidWorkMinutes <= 0 &&
+            !record.isHoliday &&
+            !record.isVacation
+        );
     }
 
     function createWeekTitle(startDate, endDate) {
